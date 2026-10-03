@@ -1,0 +1,1133 @@
+<!doctype html>
+<html lang="sk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#e11d48">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Maratón">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>MMM Košice – kde je bežec</title>
+<style>
+  :root {
+    --bg: #f4f5f7; --panel: #ffffff; --text: #111827; --muted: #6b7280; --line: #e5e7eb;
+    --accent: #e11d48; --accent-ink: #ffffff; --ok: #059669; --warn: #b45309; --chip: #2563eb;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #0b1020; --panel: #141a2e; --text: #e5e7eb; --muted: #9ca3af; --line: #263049;
+      --accent: #fb7185; --accent-ink: #1a0610; --ok: #34d399; --warn: #fbbf24; --chip: #60a5fa; }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+    font: 15px/1.35 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  body { display: flex; flex-direction: column; height: 100dvh; overflow: hidden; }
+
+  header { background: var(--panel); border-bottom: 1px solid var(--line); padding: 10px 16px 8px;
+    padding-top: max(10px, env(safe-area-inset-top)); }
+  .stats { display: grid; grid-template-columns: auto 1fr; gap: 2px 14px; align-items: baseline; }
+  .km { font-size: 34px; font-weight: 800; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; grid-row: span 2; }
+  .km small { font-size: 15px; font-weight: 600; color: var(--muted); margin-left: 2px; }
+  .line1 { font-weight: 600; font-variant-numeric: tabular-nums; }
+  .line2 { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+  #simBar { display: flex; gap: 8px; align-items: center; justify-content: space-between; flex-wrap: wrap; padding: 8px 16px;
+    background: color-mix(in srgb, var(--warn) 18%, var(--panel)); border-bottom: 1px solid var(--line); font-size: 14px; }
+  #simBar[hidden] { display: none; }
+  #simBar .simBtns { display: flex; gap: 6px; }
+  #simBar button { padding: 6px 10px; }
+  #simBar button[hidden] { display: none; }
+  .rmk { display: flex; flex-direction: column; align-items: center; transform: translateY(11px); pointer-events: none; }
+  .rmk-card { background: #fff; color: #111; border-radius: 10px; padding: 4px 8px; margin-bottom: 4px; box-shadow: 0 2px 8px rgba(0,0,0,.3);
+    font: 12px/1.25 system-ui, -apple-system, sans-serif; text-align: center; white-space: nowrap; max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
+  .rmk-card b { display: block; font-size: 13px; }
+  .rmk-card span { color: #555; }
+  .rmk-card span.sim { color: #b45309; font-weight: 700; }
+  .rmk-dot { width: 22px; height: 22px; border-radius: 50%; background: #2563eb; border: 3px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.4); box-sizing: border-box; }
+  #runBar { display: flex; gap: 6px; overflow-x: auto; padding: 6px 16px; background: var(--panel); border-bottom: 1px solid var(--line); scrollbar-width: none; }
+  #runBar[hidden] { display: none; }
+  #runBar button { flex: 0 0 auto; display: flex; align-items: center; gap: 6px; padding: 5px 10px; font-size: 13px; border-radius: 999px; }
+  #runBar button.on { background: var(--text); color: var(--panel); }
+  #runBar .dot { width: 10px; height: 10px; border-radius: 50%; flex: 0 0 auto; }
+  #runBar small { opacity: .75; font-variant-numeric: tabular-nums; }
+  .xmk { display: flex; flex-direction: column; align-items: center; transform: translateY(8px); cursor: pointer; }
+  .xmk-card { background: #fff; color: #111; border-radius: 8px; padding: 2px 6px; margin-bottom: 3px; box-shadow: 0 1px 5px rgba(0,0,0,.3);
+    font: 11px/1.2 system-ui, -apple-system, sans-serif; white-space: nowrap; }
+  .xmk-dot { width: 16px; height: 16px; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.4); box-sizing: border-box; }
+  .ldm { display: flex; flex-direction: column; align-items: center; transform: translateY(12px); cursor: pointer; }
+  .ldm-card { background: #fff; color: #111; border-radius: 8px; padding: 4px 8px; margin-bottom: 3px; box-shadow: 0 1px 6px rgba(0,0,0,.35);
+    font: 12px/1.3 system-ui, -apple-system, sans-serif; white-space: nowrap; text-align: center; }
+  .ldm-card[hidden] { display: none; }
+  .ldm-card button { margin-top: 3px; padding: 2px 8px; font-size: 12px; border-radius: 6px; }
+  .ldm-dot { min-width: 24px; height: 24px; padding: 0 5px; border-radius: 12px; border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.45);
+    font: 700 11px/20px system-ui, sans-serif; color: #111; text-align: center; box-sizing: border-box; }
+  .ldm-dot.fav { border-style: dashed; }
+  #leadersBtn { right: 190px; bottom: 12px; box-shadow: 0 2px 8px rgba(0,0,0,.25); }
+  @media (max-width: 959px) { body[data-view="sv"] #leadersBtn { display: none; } }
+  @media (min-width: 960px) { #leadersBtn { right: calc(50% + 190px); } }
+  .simtag { display: block; font-size: 11px; color: var(--warn); font-weight: 700; letter-spacing: .05em; }
+  .progress { height: 4px; background: var(--line); border-radius: 2px; margin-top: 8px; overflow: hidden; }
+  .progress > div { height: 100%; background: var(--accent); width: 0; transition: width 1s linear; }
+
+  .tabs { display: flex; gap: 6px; padding: 8px 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  .tabs button { flex: 1; white-space: nowrap; padding: 7px 8px; }
+  button { font: inherit; border: 1px solid var(--line); background: var(--panel); color: var(--text);
+    border-radius: 10px; padding: 8px 12px; cursor: pointer; }
+  button.on { background: var(--text); color: var(--panel); border-color: var(--text); }
+  button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 700; }
+  button.ghost { background: transparent; }
+  button.danger { color: var(--accent); }
+
+  main { flex: 1; position: relative; min-height: 0; display: flex; }
+  #map, #sv { flex: 1; min-width: 0; }
+  body[data-view="map"] #sv, body[data-view="sv"] #map { display: none; }
+  @media (min-width: 960px) {
+    .tabs .v { display: none; }
+    body[data-view] #map, body[data-view] #sv { display: block; }
+  }
+  .floating { position: absolute; z-index: 5; }
+  #follow { right: 12px; bottom: 12px; box-shadow: 0 2px 8px rgba(0,0,0,.25); }
+  #mode3d { right: 132px; bottom: 12px; box-shadow: 0 2px 8px rgba(0,0,0,.25); font-weight: 700; }
+  @media (max-width: 959px) { body[data-view="sv"] #mode3d { display: none; } }
+  @media (min-width: 960px) { #follow { right: calc(50% + 12px); } #mode3d { right: calc(50% + 132px); } }
+  #svInfo { left: 12px; top: 12px; background: rgba(0,0,0,.6); color: #fff; padding: 6px 10px; border-radius: 8px;
+    font-size: 13px; pointer-events: none; }
+  #svInfo:empty { display: none; }
+  @media (min-width: 960px) { #svInfo { left: calc(50% + 12px); } }
+  body[data-view="map"] #svInfo { display: none; }
+  @media (min-width: 960px) { body[data-view="map"] #svInfo:not(:empty) { display: block; } }
+  #hint { left: 50%; transform: translateX(-50%); top: 12px; background: var(--panel); border: 1px solid var(--line);
+    padding: 6px 12px; border-radius: 999px; font-size: 13px; color: var(--muted); white-space: nowrap; }
+  body[data-view="sv"] #hint { display: none; }
+  @media (max-width: 959px) { body[data-view="sv"] #follow { display: none; } }
+  @media (min-width: 960px) { #hint { left: 25%; } }
+
+  .sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; background: var(--panel);
+    border-top: 1px solid var(--line); border-radius: 16px 16px 0 0; box-shadow: 0 -8px 30px rgba(0,0,0,.25);
+    padding: 14px 16px; padding-bottom: max(14px, env(safe-area-inset-bottom)); max-height: 85dvh; overflow: auto;
+    transform: translateY(105%); transition: transform .2s ease; }
+  .sheet.open { transform: none; }
+  @media (min-width: 720px) { .sheet { left: auto; right: 16px; bottom: 16px; width: 420px; border-radius: 16px; border: 1px solid var(--line); } }
+  .sheet h2 { margin: 0 0 10px; font-size: 17px; }
+  .sheet h3 { margin: 16px 0 6px; font-size: 14px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  .row { display: flex; gap: 8px; align-items: center; margin: 8px 0; flex-wrap: wrap; }
+  .row label { flex: 1 1 140px; color: var(--muted); font-size: 13px; }
+  input { font: inherit; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg);
+    color: var(--text); min-width: 0; }
+  input[type=time], input[type=datetime-local] { font-variant-numeric: tabular-nums; }
+  .big-time { font-size: 26px; width: 100%; text-align: center; padding: 10px; }
+  .actions { display: flex; gap: 8px; margin-top: 12px; }
+  .actions button { flex: 1; padding: 12px; }
+  .muted { color: var(--muted); font-size: 13px; }
+  .warn { color: var(--warn); font-size: 13px; }
+  ul.cps { list-style: none; padding: 0; margin: 0; }
+  ul.cps li { display: grid; grid-template-columns: 64px 1fr auto; gap: 8px; align-items: center; padding: 8px 0;
+    border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+  ul.cps li b { font-size: 15px; }
+  .tag { font-size: 11px; padding: 1px 6px; border-radius: 6px; border: 1px solid currentColor; margin-left: 6px; }
+  .tag.chip { color: var(--chip); } .tag.manual { color: var(--accent); } .tag.start { color: var(--ok); }
+  table.splits { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: 14px; }
+  table.splits td { padding: 4px 0; border-bottom: 1px solid var(--line); }
+  table.splits td:last-child { text-align: right; }
+  table.splits tr.done td { color: var(--muted); }
+</style>
+</head>
+<body data-view="map">
+<header>
+  <div class="stats">
+    <div class="km" id="km">–<small>km</small></div>
+    <div class="line1" id="line1">Načítavam…</div>
+    <div class="line2" id="line2">&nbsp;</div>
+  </div>
+  <div class="progress"><div id="bar"></div></div>
+</header>
+<div class="tabs">
+  <button class="v on" data-view="map">Mapa</button>
+  <button class="v" data-view="sv">Pohľad bežca</button>
+  <button id="openSettings" class="ghost" aria-label="Nastavenia a body">☰ Body</button>
+</div>
+<div id="runBar" hidden></div>
+<div id="simBar" hidden><span id="simBarText"></span><span class="simBtns"><button id="simJoin" class="primary">Pripojiť</button><button id="simLeave">Odpojiť</button><button id="simEndAll" class="danger">Ukončiť pre všetkých</button></span></div>
+<main>
+  <div id="map"></div>
+  <div id="sv"></div>
+  <div id="hint" class="floating">Vidíš ho? Ťukni na trasu → zadaj čas</div>
+  <div id="svInfo" class="floating"></div>
+  <button id="leadersBtn" class="floating">🏅 Lídri</button>
+  <button id="mode3d" class="floating">3D</button>
+  <button id="follow" class="floating on">◎ Sledovať</button>
+</main>
+
+<!-- Zadanie času prechodu -->
+<section class="sheet" id="cpSheet" aria-label="Čas prechodu">
+  <h2 id="cpTitle">Prechod</h2>
+  <div class="muted" id="cpSub"></div>
+  <div class="row muted" id="cpAlt"></div>
+  <div class="muted" id="cpShare"></div>
+  <div class="row"><input type="time" step="1" id="cpTime" class="big-time"></div>
+  <div class="row"><button class="ghost" id="cpNow" style="flex:1">Práve teraz</button></div>
+  <div class="warn" id="cpMsg"></div>
+  <div class="actions">
+    <button id="cpCancel">Zrušiť</button>
+    <button id="cpSave" class="primary">Uložiť</button>
+  </div>
+</section>
+
+<!-- Nastavenia + zoznam bodov -->
+<section class="sheet" id="setSheet" aria-label="Nastavenia">
+  <div style="display:flex;justify-content:space-between;align-items:center">
+    <h2>Nastavenia a body</h2><button id="setClose" class="ghost">✕</button>
+  </div>
+
+  <h3>Bežec</h3>
+  <div class="row"><label for="bib">Štartové číslo</label><input id="bib" inputmode="numeric" placeholder="napr. 12345" style="flex:1 1 120px"><button id="shareBtn">Zdieľať odkaz</button></div>
+  <div class="row"><label for="discSel">Disciplína</label>
+    <select id="discSel" style="flex:1 1 160px;font:inherit;padding:8px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--text)">
+      <option value="">Automaticky (podľa čísla / čipu)</option><option value="polmaraton">Polmaratón – 1 okruh</option><option value="maraton">Maratón – 2 okruhy</option>
+      <option value="stafeta">Štafeta – 2 okruhy</option><option value="inline">Inline</option><option value="handbike">Handbike</option></select></div>
+  <div class="muted" id="waveInfo"></div>
+  <div class="muted" id="syncInfo"></div>
+  <div class="row"><label for="obsName">Tvoje meno (uvidia ho ostatní)</label><input id="obsName" placeholder="napr. Mama" maxlength="30" style="flex:1 1 140px"></div>
+  <div class="row"><label for="startAt">Čas štartu</label><input type="datetime-local" step="1" id="startAt" style="flex:1 1 200px"></div>
+  <div class="row"><label for="pace">Plánované tempo (min/km)</label><input id="pace" placeholder="4:55" style="flex:0 0 90px;text-align:center"></div>
+  <div class="muted" id="paceNote">Plánované tempo platí, kým nie je známy žiadny reálny prechod. Potom sa počíta tempo z posledného úseku.</div>
+
+  <h3>Sledovaní bežci</h3>
+  <ul class="cps" id="watchList"></ul>
+  <div class="row"><input id="watchAdd" placeholder="ďalšie štartové číslo" style="flex:1"><button id="watchAddBtn">Pridať</button></div>
+  <div class="muted">Hore v lište ťukni na bežca – toho bude sledovať kamera, Pohľad bežca a hlavička. Prechody zadávaš pre vybraného.</div>
+
+  <h3>Lídri</h3>
+  <div class="row"><label for="ldOn">Zobraziť lídrov na mape</label><input type="checkbox" id="ldOn" style="flex:0 0 auto;width:22px;height:22px"></div>
+  <div class="row" id="ldDiscs" style="gap:12px"></div>
+  <div class="row"><label for="ldN">Koľko</label>
+    <select id="ldN" style="flex:0 0 140px;font:inherit;padding:8px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--text)"><option value="1">len prvý</option><option value="3">prví traja</option></select></div>
+  <div class="row"><label for="ldSex">Zvlášť muži a ženy</label><input type="checkbox" id="ldSex" style="flex:0 0 auto;width:22px;height:22px"></div>
+  <div class="muted" id="ldStatus"></div>
+
+  <h3>Prechody</h3>
+  <ul class="cps" id="cpList"></ul>
+
+  <h3>Predikcia</h3>
+  <table class="splits" id="splits"></table>
+
+  <h3>Čipová časomiera (championchip.cz)</h3>
+  <div class="row"><div class="muted" id="chipStatus" style="flex:1">Vyžaduje štartové číslo.</div><button id="chipNow">Obnoviť</button></div>
+  <div id="chipAdmin" hidden>
+    <div class="row"><input id="chipUrl" style="flex:1" placeholder="odkaz z race.championchip.cz alebo Live výsledky"></div>
+    <div class="muted">Správca: zmena adresy platí pre všetkých.</div>
+  </div>
+
+  <h3>Simulácia</h3>
+  <div class="row"><label for="simKm">Začať od km</label><input id="simKm" inputmode="decimal" placeholder="napr. 12,5" style="flex:0 0 110px;text-align:center"></div>
+  <div class="row"><label for="simTime">alebo od času</label><input type="time" step="1" id="simTime" style="flex:0 0 130px"></div>
+  <div class="row"><label for="simSpeed">Rýchlosť</label>
+    <select id="simSpeed" style="flex:0 0 110px;font:inherit;padding:8px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--text)">
+      <option value="1">1×</option><option value="5">5×</option><option value="10" selected>10×</option><option value="30">30×</option><option value="60">60×</option></select></div>
+  <div class="actions"><button id="simStart">Spustiť simuláciu</button><button id="simStop">Ukončiť</button></div>
+  <div class="muted" id="simNote">Simulácia posúva len čas. Prechody zadané počas simulácie sa nezdieľajú.</div>
+
+  <h3 id="adminSection">Správca</h3>
+  <div id="adminOut">
+    <div class="row"><input type="password" id="adminPass" placeholder="heslo správcu" inputmode="numeric" autocomplete="current-password" style="flex:1"><button id="adminLogin">Prihlásiť</button></div>
+    <div class="warn" id="adminMsg"></div>
+  </div>
+  <div id="adminIn" hidden>
+    <div class="muted">Si prihlásený ako správca. Môžeš meniť tempo, štart, odkaz na čip, mazať čokoľvek a spúšťať simuláciu pre všetkých.</div>
+    <div class="row"><input id="adminLink" readonly style="flex:1;font-size:12px"><button id="adminCopy">Kopírovať</button></div>
+    <div class="actions"><button id="adminLogout" class="danger">Odhlásiť</button></div>
+  </div>
+
+  <h3>Ostatné</h3>
+  <div class="actions"><button id="resetAll" class="danger">Vymazať moje lokálne prechody</button></div>
+  <p class="muted">So štartovým číslom sa prechody zdieľajú so všetkými, čo sledujú toho istého bežca. Zapísať čas môže len ten, kto je do 1 km od miesta (overí sa GPS) a len do 15 minút od prechodu. Bez čísla alebo v simulácii sa ukladajú len v tomto zariadení.</p>
+  <p class="muted">Trasa: oficiálna mapa MMM 2026 (Google My Maps), prepočítaná na 21,0975 km.</p>
+</section>
+
+<script>
+'use strict';
+// ---------- konfigurácia ----------
+const CFG = {
+  raceDay: '2026-10-04',
+  defaultPace: 295,                           // s/km = 4:55 (polmaratón, kým nie je známa disciplína)
+  minSegForPace: 400,                         // m – kratší posledný úsek sa spojí s predchádzajúcim
+  claxDefault: 'https://results.championchip.cz/2026100410/MMM%202026.clax',
+  chipPollMs: 120000,
+  mapId: '63c45d1dce9d6f0fbb214d34',          // vektorová mapa (tilt + rotácia) – GCP crumbway, „maraton-3d“
+};
+const KEY = 'mmm2026.v1';
+
+// ---------- čas (simulácia: ?sim=HH:MM alebo ?simkm=12.5, voliteľne &speed=N &simday=YYYY-MM-DD) ----------
+const qs = new URLSearchParams(location.search);
+// sim.local = z URL (len toto zariadenie), sim.shared = spustil správca pre všetkých
+let sim = (qs.get('sim') || qs.get('simkm')) ? { base: null, t0: Date.now(), speed: +qs.get('speed') || 1, local: true } : null;
+const simDay = () => qs.get('simday') || CFG.raceDay;
+// čas, kedy podľa predikcie (štart, zadané prechody, tempo) bežec dosiahne daný km
+function timeAtKm(km) {
+  const target = Math.min(TOTAL(), Math.max(0, parseFloat(String(km).replace(',', '.')) * 1000));
+  let lo = startInfo().t, hi = lo + 6 * 3600e3;
+  for (let i = 0; i < 50; i++) { const m = (lo + hi) / 2; if (predict(m).d < target) lo = m; else hi = m; }
+  return hi;
+}
+function simBase() {
+  if (qs.get('sim')) return new Date(simDay() + 'T' + qs.get('sim')).getTime();
+  return timeAtKm(qs.get('simkm'));
+}
+const now = () => { if (!sim) return Date.now(); if (sim.base == null) { sim.base = simBase(); sim.t0 = Date.now(); } return sim.base + (Date.now() - sim.t0) * sim.speed; };
+
+// ---------- stav ----------
+const S = Object.assign({
+  bib: '', localPace: null, discOverride: '', localCps: [], name: '', clientId: '', adminToken: '', view: 'map',
+  simJoin: null, // t0 spoločnej simulácie, ku ktorej sa používateľ pripojil
+  // odvodené (derive): z lokálnych dát alebo zo servera
+  pace: CFG.defaultPace, cps: [], startManual: null, startCp: null, chipStart: null, chipName: null, sh: null,
+}, load());
+if (!S.clientId) S.clientId = (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2)).slice(0, 18);
+if (S.chipUrl !== undefined) { // migrácia z verzie bez zdieľania
+  S.localCps = (S.cps || []).filter(c => c.src === 'manual'); S.localPace = S.pace || CFG.defaultPace;
+  if (S.startManual) S.localCps.push({ id: 'l0', d: 0, t: S.startManual, src: 'manual', local: true });
+  delete S.chipUrl; delete S.chipOn;
+}
+// štartové číslo: číslice, elitné ženy majú predponu F (napr. F2)
+const normBib = v => (String(v || '').toUpperCase().match(/[A-Z]?\d{1,6}/) || [''])[0];
+if (!Array.isArray(S.watch)) S.watch = S.bib ? [S.bib] : [];
+if (!S.ld) S.ld = { on: false, discs: { maraton: true, polmaraton: true, stafeta: false, inline: false, handbike: false }, n: 1, sex: false };
+if (qs.get('bib')) { // ?bib=10664,1,7001 → sledovaní bežci, prvý je vybraný
+  const list = [...new Set(qs.get('bib').split(',').map(normBib).filter(Boolean))];
+  if (list.length) { S.watch = list; S.bib = list[0]; }
+}
+function ensureWatch() { if (S.bib && !S.watch.includes(S.bib)) S.watch.unshift(S.bib); }
+ensureWatch();
+if (qs.get('admin')) { S.adminToken = qs.get('admin'); const u = new URL(location.href); u.searchParams.delete('admin'); history.replaceState(null, '', u); }
+function load() { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch { return {}; } }
+function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch {} }
+
+// ---------- trasa ----------
+let R = null; // {pts:[{lat,lng}], cum:[m], total, k}
+const LOOP = 21097.5; // jeden okruh = polmaratón; maratón a štafeta bežia 2 okruhy
+// disciplíny MMM 2026 (štarty podľa programu, rozsahy čísel podľa MMM 2025; v deň pretekov rozhoduje čip)
+const DISC = {
+  maraton:    { name: 'Maratón',     laps: 2, start: '09:00', pace: 330, min: 150 },
+  polmaraton: { name: 'Polmaratón',  laps: 1, start: 'vlny', pace: CFG.defaultPace, min: 150 },
+  stafeta:    { name: 'Štafeta',     laps: 2, start: '09:00', pace: 300, min: 150 },
+  inline:     { name: 'Inline',      laps: 1, start: '08:45', pace: 110, min: 50 },
+  handbike:   { name: 'Handbike',    laps: 1, start: '08:45', pace: 150, min: 50 },
+  mini:       { name: 'Minimaratón', laps: 1, start: '—', pace: 330, min: 150, unsupported: true },
+  family:     { name: 'Family Run',  laps: 1, start: '—', pace: 400, min: 150, unsupported: true },
+};
+const CHIP_RACE = { 'Maratón': 'maraton', 'Polmaratón': 'polmaraton', 'Staf': 'stafeta', 'Inline': 'inline', 'Handbike': 'handbike', 'Mini': 'mini' };
+function discByBib(bib) {
+  const n = parseInt(bib, 10);
+  if (!(n >= 1)) return null;
+  return n >= 20001 ? 'mini' : n >= 10001 ? 'polmaraton' : n >= 7501 ? 'handbike' : n >= 7001 ? 'inline' : n >= 6001 ? 'stafeta' : 'maraton';
+}
+function disc() { // poradie: ručne > čip > oficiálna appka (TRACX) > rozsah čísel
+  const chipKey = S.chipRace && CHIP_RACE[S.chipRace];
+  const entryKey = S.entry && DISC[S.entry.disc] ? S.entry.disc : null;
+  const key = S.discOverride || chipKey || entryKey || discByBib(S.bib) || 'polmaraton';
+  const src = S.discOverride ? 'ručne' : chipKey ? 'čip' : entryKey ? 'oficiálna registrácia' : discByBib(S.bib) ? 'odhad podľa čísla' : 'predvolené';
+  return Object.assign({ key, src }, DISC[key]);
+}
+const TOTAL = () => disc().laps * LOOP;
+function hav(a, b) {
+  const r = Math.PI / 180, dLa = (b.lat - a.lat) * r, dLo = (b.lng - a.lng) * r;
+  const h = Math.sin(dLa / 2) ** 2 + Math.cos(a.lat * r) * Math.cos(b.lat * r) * Math.sin(dLo / 2) ** 2;
+  return 2 * 6371000 * Math.asin(Math.sqrt(h));
+}
+function bearing(a, b) {
+  const r = Math.PI / 180, y = Math.sin((b.lng - a.lng) * r) * Math.cos(b.lat * r);
+  const x = Math.cos(a.lat * r) * Math.sin(b.lat * r) - Math.sin(a.lat * r) * Math.cos(b.lat * r) * Math.cos((b.lng - a.lng) * r);
+  return (Math.atan2(y, x) / r + 360) % 360;
+}
+function buildRoute(j) {
+  const pts = j.points.map(([lat, lng]) => ({ lat, lng }));
+  const cum = [0];
+  for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + hav(pts[i - 1], pts[i]));
+  const total = cum[cum.length - 1];
+  return { pts, cum, total, k: LOOP / total }; // k: geo m → pretekárske m (jeden okruh)
+}
+// pretekárska vzdialenosť (m) → bod na trase
+function pointAt(d) {
+  let dl = d % LOOP; if (d > 0 && dl === 0) dl = LOOP; // ďalší okruh = tá istá trasa
+  const g = Math.max(0, Math.min(R.total, dl / R.k));
+  let lo = 0, hi = R.cum.length - 1;
+  while (hi - lo > 1) { const m = (lo + hi) >> 1; if (R.cum[m] <= g) lo = m; else hi = m; }
+  const seg = R.cum[hi] - R.cum[lo] || 1, f = (g - R.cum[lo]) / seg, a = R.pts[lo], b = R.pts[hi];
+  return { lat: a.lat + (b.lat - a.lat) * f, lng: a.lng + (b.lng - a.lng) * f };
+}
+// prichytenie kliknutia na trasu; pri viacerých blízkych úsekoch (štart/cieľ, kríženia) vyhrá ten bližšie k predikcii
+function snap(ll, hintD) {
+  const r = Math.PI / 180, cosLat = Math.cos(ll.lat * r), M = 111320;
+  const xy = p => ({ x: (p.lng - ll.lng) * M * cosLat, y: (p.lat - ll.lat) * M });
+  const cands = [];
+  for (let i = 0; i < R.pts.length - 1; i++) {
+    const a = xy(R.pts[i]), b = xy(R.pts[i + 1]), dx = b.x - a.x, dy = b.y - a.y, L2 = dx * dx + dy * dy || 1;
+    const t = Math.max(0, Math.min(1, -(a.x * dx + a.y * dy) / L2));
+    const px = a.x + t * dx, py = a.y + t * dy;
+    const dl = (R.cum[i] + t * (R.cum[i + 1] - R.cum[i])) * R.k;
+    for (let lap = 0; lap < disc().laps; lap++) cands.push({ dist: Math.hypot(px, py), d: dl + lap * LOOP });
+  }
+  const best = Math.min(...cands.map(c => c.dist));
+  if (best > 300) return null;
+  // kandidáti do 40 m od najbližšieho; zlúčiť susedné úseky (ten istý prechod)
+  const near = cands.filter(c => c.dist <= best + 40).sort((a, b) => a.d - b.d);
+  const groups = [];
+  for (const c of near) {
+    const g = groups[groups.length - 1];
+    if (g && c.d - g.last < 150) { g.last = c.d; if (c.dist < g.dist) { g.dist = c.dist; g.d = c.d; } }
+    else groups.push({ d: c.d, dist: c.dist, last: c.d });
+  }
+  groups.sort((a, b) => Math.abs(a.d - hintD) - Math.abs(b.d - hintD));
+  return groups.map(g => g.d); // [0] = najpravdepodobnejší
+}
+
+// ---------- štart a predikcia ----------
+function waveStart(bib) { // polmaratón: vlny po 3 min podľa čísla (10001–11000 o 10:30 … 16001+ o 10:48)
+  const n = parseInt(bib, 10);
+  const base = new Date(CFG.raceDay + 'T10:30:00').getTime();
+  if (!(n >= 10001)) return null;
+  return base + Math.min(6, Math.floor((n - 10001) / 1000)) * 3 * 60000;
+}
+// TRACX pozná štart trate (nie vlnu) – pri polmaratóne preto platia vlny podľa čísla (startFor)
+function discStart() { return startFor(S.bib, disc().key, S.entry); }
+// --- generický model ľubovoľného bežca (ďalší sledovaní, lídri) – rovnaká logika ako hlavný bežec ---
+function startFor(bib, key, entry) {
+  if (key === 'polmaraton') { const w = waveStart(bib); return w ? { t: w, src: 'vlna podľa čísla' } : { t: new Date(CFG.raceDay + 'T10:30:00').getTime(), src: 'prvá vlna' }; }
+  if (entry && entry.start && entry.disc === key) return { t: entry.start, src: 'oficiálna registrácia' };
+  const D = DISC[key];
+  return { t: new Date(CFG.raceDay + 'T' + (D.start.includes(':') ? D.start : '10:30') + ':00').getTime(), src: 'štart ' + D.name.toLowerCase() };
+}
+function modelOf(bib, sh) {
+  const ck = sh && sh.chip && sh.chip.race && CHIP_RACE[sh.chip.race];
+  const ek = sh && sh.entry && DISC[sh.entry.disc] ? sh.entry.disc : null;
+  const key = ck || ek || discByBib(bib) || 'polmaraton', D = DISC[key];
+  const manual = sh ? sh.cps || [] : [];
+  const starts = manual.filter(c => c.d < 50);
+  const chipCps = sh && sh.chip && sh.chip.cps || [];
+  const tx = (sh && sh.tracx && sh.tracx.cps || []).filter(x => !chipCps.some(c => Math.abs(c.d - x.d) < 150));
+  const start = sh && (sh.chip && sh.chip.start || sh.tracx && sh.tracx.start) || (starts.length ? starts[starts.length - 1].t : null) || startFor(bib, key, sh && sh.entry).t;
+  return { bib, key, D, T: D.laps * LOOP, name: sh && (sh.chip && sh.chip.name || sh.entry && sh.entry.name) || '', start,
+    cps: [...manual.filter(c => c.d >= 50), ...chipCps, ...tx], pace: sh && sh.pace || D.pace };
+}
+function predictOf(m, t) {
+  const all = [{ d: 0, t: m.start, src: 'start' }, ...m.cps.filter(c => c.t > m.start)].sort((a, b) => a.d - b.d);
+  return predictCore(all, m.pace, m.T, m.D.min, t);
+}
+function startInfo() {
+  if (S.chipStart) return { t: S.chipStart, src: 'čip' };
+  if (S.startManual) return { t: S.startManual, src: 'ručne' };
+  return discStart();
+}
+function anchors() {
+  const st = startInfo().t;
+  const list = [{ d: 0, t: st, src: 'start' }, ...S.cps.filter(c => c.t > st)];
+  return list.sort((a, b) => a.d - b.d);
+}
+function paceFrom(list) { return paceCore(list, S.pace, disc().min); }
+function paceCore(list, pace, min) { // ms na meter, z posledného úseku (min. CFG.minSegForPace)
+  if (list.length < 2) return { p: pace, from: null };
+  const last = list[list.length - 1];
+  let prev = list[0];
+  for (let i = list.length - 2; i >= 0; i--) { if (last.d - list[i].d >= CFG.minSegForPace) { prev = list[i]; break; } }
+  const p = (last.t - prev.t) / Math.max(1, last.d - prev.d);
+  return { p: Math.min(720, Math.max(min, p)), from: prev, to: last }; // napr. 2:30–12:00 /km
+}
+function predict(t) { return predictCore(anchors(), S.pace, TOTAL(), disc().min, t); }
+function predictCore(all, pace, T, min, t) {
+  const st = all[0].t;
+  if (t < st) return { d: 0, state: 'pre', st, pace, all };
+  const known = all.filter(a => a.t <= t);
+  const last = known[known.length - 1];
+  const pc = known.length > 1 ? paceCore(known, pace, min) : { p: pace, from: null }; // p v ms/m == s/km
+  if (last.d >= T - 1) return { d: T, state: 'done', st, pace: pc.p, pc, last, all, finish: last.t };
+  const d = Math.min(T, last.d + (t - last.t) / pc.p);
+  return { d, state: d >= T ? 'done-pred' : 'run', st, pace: pc.p, pc, last, all };
+}
+const fmtPace = sPerKm => { const s = Math.round(sPerKm); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+const fmtDur = ms => { const s = Math.max(0, Math.round(ms / 1000)); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60;
+  return (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(x).padStart(2, '0'); };
+const fmtClock = t => new Date(t).toLocaleTimeString('sk-SK', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+const fmtKm = d => (d / 1000).toFixed(2).replace('.', ',');
+const pad = n => String(n).padStart(2, '0');
+const toLocalInput = t => { const d = new Date(t); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`; };
+// čas prechodu sa vzťahuje na dnešný (v simulácii simulovaný) deň
+const timeOnStartDay = hms => { const day = toLocalInput(now()).slice(0, 10); return new Date(`${day}T${hms.length === 5 ? hms + ':00' : hms}`).getTime(); };
+
+// ---------- zdieľané dáta (server /api) ----------
+let SH = S.sh || null, syncMsg = '', syncTimer = null;
+const isShared = () => !!S.bib;                 // s číslom čítame zo servera
+const canShare = () => !!S.bib && (!sim || !!sim.shared); // na server: skutočné prechody, alebo prechody spoločnej simulácie
+const isAdmin = () => !!(S.adminToken && SH && SH.admin);
+const hdrs = (json) => Object.assign(json ? { 'Content-Type': 'application/json' } : {}, S.adminToken ? { 'X-Admin-Token': S.adminToken } : {});
+function derive() {
+  const sh = isShared() && SH && SH.bib === S.bib ? SH : null;
+  // spoločná simulácia → jej zdieľané prechody; lokálna simulácia alebo bez čísla → prechody z tohto zariadenia
+  const extra = sim && sim.shared ? (sh && sh.simCps || []) : (isShared() && !sim ? [] : S.localCps);
+  const manual = [...(sh ? sh.cps : []), ...extra];
+  const starts = manual.filter(c => c.d < 50);
+  S.startCp = starts.length ? starts[starts.length - 1] : null; // posledné upresnenie štartu vyhráva
+  S.startManual = S.startCp ? S.startCp.t : null;
+  // čip (.clax) má prednosť; TRACX dopĺňa medzičasy, ktoré v .clax ešte nie sú
+  const chipCps = sh && sh.chip && sh.chip.cps || [];
+  const txCps = (sh && sh.tracx && sh.tracx.cps || []).filter(x => !chipCps.some(c => Math.abs(c.d - x.d) < 150));
+  S.cps = [...manual.filter(c => c.d >= 50), ...chipCps, ...txCps];
+  S.chipStart = sh && (sh.chip && sh.chip.start || sh.tracx && sh.tracx.start) || null;
+  S.chipName = sh && sh.chip && sh.chip.name || null;
+  S.chipRace = sh && sh.chip && sh.chip.race || null;
+  // posledný známy záznam z registrácie podržať, keby ho server dočasne nevrátil
+  if (sh && sh.entry) S.entryKnown = Object.assign({}, S.entryKnown, { [S.bib]: sh.entry });
+  S.entry = sh && sh.entry || (S.entryKnown && S.entryKnown[S.bib]) || null;
+  S.pace = (sh ? sh.pace : S.localPace) || disc().pace; // nenastavené tempo → typické pre disciplínu
+}
+function refreshAll() {
+  derive(); save(); renderCpMarkers(); renderKmMarkers(); svLastD = -1e9; tick();
+  if ($('setSheet').classList.contains('open')) { renderWave(); renderCpList(); renderChipStatus(); renderAdmin(); }
+}
+async function sync() {
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(sync, 20000);
+  if (!isShared()) { SH = null; S.sh = null; syncMsg = ''; refreshAll(); return document.visibilityState === 'visible' && syncOthers(); }
+  if (document.visibilityState !== 'visible') return;
+  try {
+    const r = await fetch(`/api/runner/${S.bib}?clientId=${encodeURIComponent(S.clientId)}`, { headers: hdrs(), cache: 'no-store' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    SH = await r.json(); SH._recv = Date.now(); S.sh = SH; XS[S.bib] = SH; syncMsg = 'Zdieľané · aktualizované ' + fmtClock(Date.now());
+    applySharedSim();
+  } catch (e) { syncMsg = 'Bez spojenia so serverom (' + e.message + ') – zobrazujem posledné známe dáta'; }
+  refreshAll();
+  syncOthers();
+}
+// ďalší sledovaní bežci (len čítanie) + lídri
+const XS = {}; // bib → odpoveď servera
+let LD = null, ldMsg = '';
+async function syncOthers() {
+  await Promise.all(S.watch.filter(b => b !== S.bib).map(async b => {
+    try { const r = await fetch(`/api/runner/${b}`, { cache: 'no-store' }); if (r.ok) { XS[b] = await r.json(); XS[b]._recv = Date.now(); } } catch {}
+  }));
+  if (S.ld.on) {
+    try { const r = await fetch('/api/leaders', { cache: 'no-store' }); if (r.ok) { LD = await r.json(); ldMsg = `Zdroj: ${LD.source} · ${fmtClock(Date.now())}`; } }
+    catch (e) { ldMsg = 'Lídri: bez spojenia (' + e.message + ')'; }
+  }
+  renderRunBar(); renderLeaderStatus(); tick();
+}
+function applySharedSim() {
+  if (sim && sim.local) return renderSimBar(); // lokálna simulácia z URL má prednosť
+  const ss = SH && SH.bib === S.bib && SH._recv && SH.sim;
+  const was = !!sim;
+  if (ss && S.simJoin === ss.t0) { const off = SH.serverTime - SH._recv; sim = { base: ss.base, t0: ss.t0 - off, speed: ss.speed, shared: true }; } // čas servera → hodiny klienta
+  else sim = null;
+  if (was !== !!sim) { svLastD = -1e9; camHeading = null; }
+  renderSimBar();
+}
+// lišta: beží simulácia správcu → pripojiť / odpojiť (správca ju vie aj ukončiť)
+function renderSimBar() {
+  const ss = SH && SH.bib === S.bib && SH.sim;
+  $('simBar').hidden = !ss;
+  if (!ss) return;
+  const joined = !!(sim && sim.shared), local = !!(sim && sim.local);
+  $('simBarText').textContent = joined ? `Si v simulácii správcu (${ss.speed}×). Prechody v nej vidia všetci pripojení.`
+    : local ? `Správca spustil spoločnú simuláciu (${ss.speed}×). Teraz máš vlastnú simuláciu.`
+    : `Správca spustil simuláciu (${ss.speed}×). Ty vidíš skutočný beh.`;
+  $('simJoin').hidden = joined; $('simLeave').hidden = !joined; $('simEndAll').hidden = !isAdmin();
+}
+async function api(method, path, body) {
+  const r = await fetch(path, { method, headers: hdrs(!!body), body: body ? JSON.stringify(body) : undefined });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || 'HTTP ' + r.status);
+  return j;
+}
+function getPos() {
+  return new Promise((ok, bad) => {
+    if (!navigator.geolocation) return bad(new Error('prehliadač nevie zistiť polohu'));
+    navigator.geolocation.getCurrentPosition(p => ok(p.coords),
+      e => bad(new Error(e.code === 1 ? 'povoľ prístup k polohe – bez nej nemôžeš upresniť čas pre ostatných' : 'polohu sa nepodarilo zistiť, skús znova')),
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: 30000 });
+  });
+}
+
+// ---------- UI hlavička ----------
+const $ = id => document.getElementById(id);
+function renderHeader(P) {
+  const t = now();
+  $('km').innerHTML = fmtKm(P.d) + '<small>km</small>' + (sim ? `<small class="simtag">${sim.shared ? 'SIMULÁCIA' : 'SIM'} ${sim.speed}×</small>` : '');
+  $('bar').style.width = (P.d / TOTAL() * 100).toFixed(2) + '%';
+  if (P.state === 'pre') {
+    $('line1').textContent = 'Štart o ' + fmtClock(P.st) + ' (' + startInfo().src + ')';
+    $('line2').textContent = 'o ' + fmtDur(P.st - t) + ' · tempo ' + fmtPace(S.pace) + '/km · cieľ ~ ' + fmtClock(P.st + TOTAL() * S.pace);
+    return;
+  }
+  const paceSrc = P.pc && P.pc.from ? `úsek ${(P.pc.from.d / 1000).toFixed(1).replace('.', ',')}–${(P.pc.to.d / 1000).toFixed(1).replace('.', ',')} km` : 'plánované';
+  if (P.state === 'done') {
+    $('line1').textContent = 'V cieli · ' + fmtDur(P.finish - P.st);
+    $('line2').textContent = 'dobehol o ' + fmtClock(P.finish) + ' · priemer ' + fmtPace((P.finish - P.st) / TOTAL()) + '/km';
+    return;
+  }
+  const eta = P.last.t + (TOTAL() - P.last.d) * P.pace;
+  if (P.state === 'done-pred') { // podľa predikcie dobehol – čas sa zastaví na odhadovanom cieli
+    $('line1').textContent = `V cieli (odhad) · ${fmtDur(eta - P.st)}`;
+    $('line2').textContent = `dobehol asi o ${fmtClock(eta)} · tempo ${fmtPace(P.pace)}/km (${paceSrc})`;
+    return;
+  }
+  $('line1').textContent = `${fmtPace(P.pace)}/km · beží ${fmtDur(t - P.st)}`;
+  $('line2').textContent = `tempo: ${paceSrc} · ` + 'cieľ ~' + fmtClock(eta).slice(0, 5) + ' (' + fmtDur(eta - P.st) + ')';
+}
+
+// ---------- mapa ----------
+let map, runner, cpMarkers = [], tempMarker = null, follow = true, routeLine;
+function initMap() {
+  map = new google.maps.Map($('map'), {
+    center: R.pts[0], zoom: 14, clickableIcons: false, streetViewControl: false, mapTypeControl: false,
+    fullscreenControl: false, gestureHandling: 'greedy', mapId: CFG.mapId,
+  });
+  routeLine = new google.maps.Polyline({ map, path: R.pts, strokeColor: '#e11d48', strokeOpacity: .85, strokeWeight: 5 });
+  const b = new google.maps.LatLngBounds(); R.pts.forEach(p => b.extend(p)); map.fitBounds(b, 20);
+  renderKmMarkers();
+  new google.maps.Marker({ map, position: R.pts[0], title: 'Štart / cieľ', zIndex: 2,
+    label: { text: 'S/C', fontSize: '10px', fontWeight: '700', color: '#fff' },
+    icon: { path: google.maps.SymbolPath.CIRCLE, scale: 13, fillColor: '#059669', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2 } });
+  const el = document.createElement('div');
+  el.className = 'rmk';
+  el.innerHTML = '<div class="rmk-card"><b></b><span></span></div><div class="rmk-dot"></div>';
+  runner = new google.maps.marker.AdvancedMarkerElement({ map, position: R.pts[0], zIndex: 10, content: el, title: 'Bežec' });
+  runner.getPosition = () => runner.position; // spoločné rozhranie so starým Markerom
+  runner.setPosition = p => { runner.position = p; };
+  const onClick = e => openCp(e.latLng.toJSON());
+  map.addListener('click', onClick);
+  routeLine.addListener('click', onClick);
+  map.addListener('dragstart', () => setFollow(false));
+  initSV();
+  renderCpMarkers();
+  tick();
+  if (lastP.state !== 'pre' || S.map3d) setFollow(true);
+  set3D(!!S.map3d);
+  setInterval(tick, 1000);
+  requestAnimationFrame(camLoop);
+}
+let kmMarkers = [], kmLaps = 0;
+function renderKmMarkers() { // km značky; pri 2 okruhoch aj druhé kolo (22–42)
+  if (!map || kmLaps === disc().laps) return;
+  kmMarkers.forEach(m => m.setMap(null)); kmLaps = disc().laps;
+  kmMarkers = [];
+  for (let km = 1; km < TOTAL() / 1000; km++) kmMarkers.push(new google.maps.Marker({ map, position: pointAt(km * 1000), clickable: false, zIndex: km > 21 ? 0 : 1,
+    icon: { path: google.maps.SymbolPath.CIRCLE, scale: km > 21 ? 9 : 8, fillColor: km > 21 ? '#fde68a' : '#fff', fillOpacity: 1, strokeColor: '#e11d48', strokeWeight: 2 },
+    label: { text: String(km), fontSize: '9px', fontWeight: '700', color: '#111' } }));
+}
+// sledovanie: 'one' = vybraný bežec (aj 3D kamera), 'all' = v zábere všetci sledovaní + zobrazení lídri
+function setFollow(v, mode) {
+  follow = v; if (mode) S.followMode = mode;
+  if (!S.followMode) S.followMode = 'one';
+  const all = v && S.followMode === 'all';
+  $('follow').classList.toggle('on', v);
+  $('follow').textContent = all ? '⤢ Všetci' : '◎ Sledovať';
+  if (!v || !runner) return;
+  if (all) { if (S.map3d) map.moveCamera({ tilt: 0, heading: 0 }); return fitAll(true); }
+  if (S.map3d) { camHeading = null; return; } // kameru vedie camLoop
+  map.panTo(runner.getPosition()); if (map.getZoom() < 15) map.setZoom(15);
+}
+function fitAll(force) {
+  if (!map) return;
+  const pts = [runner && runner.position, ...Object.values(xMarkers).map(m => m.position), ...Object.values(ldMarkers).map(m => m.position)].filter(Boolean);
+  if (!pts.length) return;
+  const b = new google.maps.LatLngBounds(); pts.forEach(p => b.extend(p));
+  // prestaviť len keď niekto vypadol zo záberu (s okrajom) alebo sú všetci natlačení v malom kúte
+  const vb = map.getBounds();
+  if (!force && vb) {
+    const ne = vb.getNorthEast(), sw = vb.getSouthWest(), mLat = (ne.lat() - sw.lat()) * .12, mLng = (ne.lng() - sw.lng()) * .12;
+    const inside = pts.every(p => { const la = typeof p.lat === 'function' ? p.lat() : p.lat, ln = typeof p.lng === 'function' ? p.lng() : p.lng;
+      return la < ne.lat() - mLat && la > sw.lat() + mLat && ln < ne.lng() - mLng && ln > sw.lng() + mLng; });
+    const span = b.toSpan(), vspan = vb.toSpan();
+    if (inside && (span.lat() > vspan.lat() * .25 || span.lng() > vspan.lng() * .25 || map.getZoom() >= 16)) return;
+  }
+  if (pts.length === 1) { map.panTo(pts[0]); if (map.getZoom() < 15) map.setZoom(15); return; }
+  map.fitBounds(b, { top: 90, bottom: 70, left: 40, right: 40 });
+  google.maps.event.addListenerOnce(map, 'idle', () => { if (map.getZoom() > 16) map.setZoom(16); });
+}
+// štítok bežca: číslo, meno, disciplína a čo práve vidíme (predikcia / simulácia / cieľ)
+function renderRunnerLabel(P) {
+  if (!runner) return;
+  const card = runner.content.querySelector('.rmk-card');
+  const name = S.chipName || (S.entry && S.entry.name) || '';
+  const title = !S.bib ? 'Zadaj štartové číslo v ☰ Body' : '#' + S.bib + ' ' + (name || '');
+  const state = P.state === 'pre' ? 'pred štartom' : P.state === 'done' ? 'v cieli' : P.state === 'done-pred' ? 'asi v cieli' : 'predikcia';
+  const mode = sim ? (sim.shared ? 'SIMULÁCIA' : 'SIM') : '';
+  const sub = `${disc().name} · ${fmtKm(P.d)} km · ` + (mode ? `<span class="sim">${mode}</span>` : state);
+  const key = title + '|' + sub;
+  if (card.dataset.k === key) return;
+  card.dataset.k = key;
+  card.querySelector('b').textContent = title;
+  card.querySelector('span').innerHTML = sub;
+}
+// ---------- 3D: kamera „za bežcom“ (vektorová mapa s náklonom) ----------
+let camHeading = null, camLast = 0;
+function set3D(on) {
+  S.map3d = on; save();
+  $('mode3d').classList.toggle('on', on);
+  if (!map) return;
+  if (on) { camHeading = null; setFollow(true, 'one'); }
+  else map.moveCamera({ tilt: 0, heading: 0, zoom: Math.min(map.getZoom(), 15), center: follow ? runner.getPosition() : map.getCenter() });
+}
+function camLoop(ts) {
+  requestAnimationFrame(camLoop);
+  if (!S.map3d || !follow || S.followMode === 'all' || document.visibilityState !== 'visible' || getComputedStyle($('map')).display === 'none') return;
+  if (ts - camLast < 50) return; // ~20 fps stačí
+  camLast = ts;
+  const d = predict(now()).d, pos = pointAt(d);
+  const target = bearing(pointAt(Math.max(0, d - 30)), pointAt(Math.min(TOTAL(), d + 80)));
+  if (camHeading == null) camHeading = target;
+  else { const diff = ((target - camHeading + 540) % 360) - 180; camHeading = (camHeading + diff * 0.04 + 360) % 360; } // plynulé otáčanie v zákrutách
+  runner.setPosition(pos);
+  map.moveCamera({ center: pos, heading: camHeading, tilt: 67, zoom: 18 });
+}
+function renderCpMarkers() {
+  if (!map) return;
+  cpMarkers.forEach(m => m.setMap(null));
+  cpMarkers = S.cps.map(c => new google.maps.Marker({ map, position: pointAt(c.d), zIndex: 5,
+    title: `${fmtKm(c.d)} km · ${fmtClock(c.t)} (${c.src === 'chip' ? 'čip' : (c.name || 'ručne')})`,
+    icon: { path: google.maps.SymbolPath.BACKWARD_CLOSED_ARROW, scale: 5, fillColor: c.src === 'chip' ? '#2563eb' : '#f59e0b', fillOpacity: 1, strokeColor: '#111', strokeWeight: 1 } }));
+}
+
+// ---------- Street View ----------
+let pano, svc, svLastD = -1e9, svPanoId = null, svBusy = false;
+function initSV() {
+  svc = new google.maps.StreetViewService();
+  pano = new google.maps.StreetViewPanorama($('sv'), {
+    addressControl: false, linksControl: false, clickToGo: false, showRoadLabels: false, motionTracking: false,
+    motionTrackingControl: false, fullscreenControl: false, enableCloseButton: false, zoomControl: false, panControl: false, visible: true,
+  });
+}
+function svVisible() { return getComputedStyle($('sv')).display !== 'none'; }
+function updateSV(d, force) {
+  if (!pano || svBusy || !svVisible()) return;
+  if (!force && Math.abs(d - svLastD) < 8) return; // nová panoráma má zmysel až po ~8 m
+  svBusy = true; svLastD = d;
+  const at = pointAt(d), ahead = pointAt(Math.min(TOTAL(), d + 30));
+  svc.getPanorama({ location: at, radius: 50, source: google.maps.StreetViewSource.OUTDOOR,
+    preference: google.maps.StreetViewPreference.NEAREST }, (data, status) => {
+    svBusy = false;
+    if (status !== 'OK') { $('svInfo').textContent = `km ${fmtKm(d)} · tu nie je Street View`; return; }
+    const loc = data.location.latLng.toJSON();
+    const heading = d >= TOTAL() - 30 ? bearing(pointAt(d - 30), at) : bearing(loc, ahead);
+    if (data.location.pano !== svPanoId) { svPanoId = data.location.pano; pano.setPano(svPanoId); }
+    pano.setPov({ heading, pitch: 0 });
+    pano.setZoom(0);
+    $('svInfo').textContent = `km ${fmtKm(d)} · snímka ${data.imageDate || ''}`;
+  });
+}
+
+// ---------- tick ----------
+let lastP = null;
+function tick() {
+  const P = predict(now());
+  lastP = P;
+  renderHeader(P);
+  const pos = pointAt(P.d);
+  const chase = follow && S.followMode !== 'all';
+  if (runner && !(S.map3d && chase)) { runner.setPosition(pos); if (chase && document.visibilityState === 'visible') map.panTo(pos); }
+  updateSV(P.d);
+  renderRunnerLabel(P);
+  renderOthers();
+  if (follow && S.followMode === 'all' && document.visibilityState === 'visible') fitAll(false);
+  if ($('setSheet').classList.contains('open')) renderSplits(P);
+}
+
+// ---------- ďalší sledovaní bežci: farebné bodky, lišta, prepínanie ----------
+const PALETTE = ['#2563eb', '#db2777', '#059669', '#7c3aed', '#ea580c', '#0891b2', '#ca8a04', '#4b5563'];
+const LETTER = { maraton: 'M', polmaraton: 'P', stafeta: 'Š', inline: 'I', handbike: 'H' };
+const colorOf = bib => PALETTE[Math.max(0, S.watch.indexOf(bib)) % PALETTE.length];
+// TRACX píše „Meno Priezvisko“, čip „Priezvisko Meno“ – nehádať poradie, len skrátiť
+const firstName = n => { const x = String(n || '').trim(); return x.length > 18 ? x.slice(0, 17) + '…' : x; };
+let xMarkers = {}, ldMarkers = {};
+function othersModels() { return S.watch.filter(b => b !== S.bib).map(b => ({ m: modelOf(b, XS[b]), b })); }
+function renderOthers() {
+  if (!map || !google.maps.marker) return;
+  const t = now(), seen = new Set();
+  for (const { m, b } of othersModels()) {
+    seen.add(b);
+    const P = predictOf(m, t);
+    let mk = xMarkers[b];
+    if (!mk) {
+      const el = document.createElement('div'); el.className = 'xmk';
+      el.innerHTML = '<div class="xmk-card"></div><div class="xmk-dot"></div>';
+      el.addEventListener('click', e => { e.stopPropagation(); focusRunner(b); });
+      mk = xMarkers[b] = new google.maps.marker.AdvancedMarkerElement({ map, content: el, zIndex: 8, gmpClickable: true });
+    }
+    mk.content.querySelector('.xmk-dot').style.background = colorOf(b);
+    const txt = `#${b} ${firstName(m.name)} · ${LETTER[m.key] || ''} ${P.state === 'pre' ? 'štart' : fmtKm(P.d)}`;
+    const card = mk.content.querySelector('.xmk-card'); if (card.textContent !== txt) card.textContent = txt;
+    mk.position = pointAt(P.d);
+  }
+  for (const b of Object.keys(xMarkers)) if (!seen.has(b)) { xMarkers[b].map = null; delete xMarkers[b]; }
+  renderLeaders(t);
+  updateRunBarStats(t);
+}
+function focusRunner(bib) {
+  bib = normBib(bib); if (!bib) return;
+  if (!S.watch.includes(bib)) S.watch.push(bib);
+  if (bib === S.bib) return setFollow(true, 'one');
+  S.bib = bib; S.discOverride = ''; kmLaps = 0; camHeading = null; svLastD = -1e9;
+  SH = XS[bib] || null; S.sh = SH;
+  save(); refreshAll(); renderRunBar(); setFollow(true, S.followMode === 'all' ? 'all' : 'one'); sync();
+  if ($('setSheet').classList.contains('open')) fillSettings();
+}
+function renderRunBar() {
+  const bar = $('runBar');
+  bar.hidden = S.watch.length < 2;
+  if (bar.hidden) return;
+  const key = S.watch.join(',') + '|' + S.bib;
+  if (bar.dataset.k !== key) {
+    bar.dataset.k = key;
+    bar.innerHTML = S.watch.map(b => `<button data-b="${b}" class="${b === S.bib ? 'on' : ''}"><span class="dot" style="background:${colorOf(b)}"></span><span class="nm">#${b}</span> <small></small></button>`).join('') +
+      '<button data-add="1">＋</button>';
+    bar.querySelectorAll('[data-b]').forEach(x => x.onclick = () => focusRunner(x.dataset.b));
+    bar.querySelector('[data-add]').onclick = () => { const v = normBib(prompt('Štartové číslo ďalšieho bežca:') || ''); if (v) { focusRunner(v); } };
+  }
+  updateRunBarStats(now());
+}
+function updateRunBarStats(t) {
+  const bar = $('runBar'); if (bar.hidden) return;
+  bar.querySelectorAll('[data-b]').forEach(x => {
+    const b = x.dataset.b, m = b === S.bib ? null : modelOf(b, XS[b]);
+    const P = b === S.bib ? (lastP || predict(t)) : predictOf(m, t);
+    const name = b === S.bib ? (S.chipName || (S.entry && S.entry.name)) : m.name;
+    const nm = `#${b} ${firstName(name)}`, st = P.state === 'pre' ? 'pred štartom' : P.state === 'done' || P.state === 'done-pred' ? 'cieľ' : fmtKm(P.d) + ' km';
+    if (x.querySelector('.nm').textContent !== nm) x.querySelector('.nm').textContent = nm;
+    if (x.querySelector('small').textContent !== st) x.querySelector('small').textContent = st;
+  });
+}
+
+// ---------- lídri ----------
+const MEDAL = ['#f5b301', '#c0c4cc', '#d08a4b'];
+function leaderItems() {
+  if (!S.ld.on || !LD || !LD.disciplines) return [];
+  const out = [];
+  for (const [key, on] of Object.entries(S.ld.discs)) {
+    const d = on && LD.disciplines[key]; if (!d) continue;
+    for (const cat of S.ld.sex ? ['M', 'F'] : ['all']) {
+      (d[cat] || []).slice(0, S.ld.n).forEach((r, i) => out.push({ id: `${key}-${cat}-${i}`, rank: i + 1, cat, fav: d.fav, key, r }));
+    }
+  }
+  return out;
+}
+function renderLeaders(t) {
+  const seen = new Set();
+  for (const it of leaderItems()) {
+    if (S.watch.includes(it.r.bib)) continue; // už ho sledujem – má vlastnú bodku
+    seen.add(it.id);
+    const D = DISC[it.key];
+    const m = { bib: it.r.bib, key: it.key, D, T: D.laps * LOOP, name: it.r.name, start: it.r.start || startFor(it.r.bib, it.key, null).t,
+      cps: it.r.cps || [], pace: it.r.pace || D.pace };
+    const P = predictOf(m, t);
+    let mk = ldMarkers[it.id];
+    if (!mk) {
+      const el = document.createElement('div'); el.className = 'ldm';
+      el.innerHTML = '<div class="ldm-card" hidden><b></b><div class="info"></div><button>Sledovať</button></div><div class="ldm-dot"></div>';
+      el.querySelector('.ldm-dot').addEventListener('click', e => { e.stopPropagation(); const c = el.querySelector('.ldm-card'); c.hidden = !c.hidden; });
+      el.querySelector('button').addEventListener('click', e => { e.stopPropagation(); focusRunner(el.dataset.bib); });
+      mk = ldMarkers[it.id] = new google.maps.marker.AdvancedMarkerElement({ map, content: el, zIndex: 6 - it.rank, gmpClickable: true });
+    }
+    const el = mk.content; el.dataset.bib = it.r.bib;
+    const dot = el.querySelector('.ldm-dot');
+    const lbl = `${LETTER[it.key] || ''}${it.rank}${it.cat === 'F' ? '♀' : it.cat === 'M' ? '♂' : ''}`;
+    if (dot.textContent !== lbl) dot.textContent = lbl;
+    dot.style.background = MEDAL[it.rank - 1]; dot.classList.toggle('fav', !!it.fav);
+    el.querySelector('b').textContent = `#${it.r.bib} ${it.r.name}${it.r.nat ? ' (' + it.r.nat + ')' : ''}`;
+    el.querySelector('.info').textContent = `${D.name} · ${it.fav ? 'favorit' : it.rank + '. miesto'} · ` +
+      (P.state === 'pre' ? 'pred štartom' : P.state === 'done' ? 'v cieli ' + fmtDur(P.finish - P.st) : `${fmtKm(P.d)} km · ${fmtPace(P.pace)}/km`);
+    mk.position = pointAt(P.d);
+  }
+  for (const id of Object.keys(ldMarkers)) if (!seen.has(id)) { ldMarkers[id].map = null; delete ldMarkers[id]; }
+}
+function renderLeaderStatus() {
+  $('leadersBtn').classList.toggle('on', !!S.ld.on);
+  if (!$('setSheet').classList.contains('open')) return;
+  const live = LD && LD.disciplines && Object.values(LD.disciplines).some(d => !d.fav);
+  $('ldStatus').textContent = !S.ld.on ? 'Vypnuté.' : !LD ? 'Načítavam…' :
+    (live ? 'Poradie podľa posledného merania z čipu. ' : 'Pred prvým meraním: favoriti (najnižšie čísla) s typickým tempom. ') + ldMsg;
+}
+function fillLeaderSettings() {
+  $('ldOn').checked = !!S.ld.on; $('ldN').value = String(S.ld.n); $('ldSex').checked = !!S.ld.sex;
+  $('ldDiscs').innerHTML = Object.keys(S.ld.discs).map(k => `<label style="flex:0 0 auto;color:var(--text)"><input type="checkbox" data-k="${k}" ${S.ld.discs[k] ? 'checked' : ''}> ${DISC[k].name}</label>`).join('');
+  $('ldDiscs').querySelectorAll('input').forEach(x => x.onchange = () => { S.ld.discs[x.dataset.k] = x.checked; save(); tick(); });
+  renderLeaderStatus();
+}
+function setLeaders(on) { S.ld.on = on; save(); renderLeaderStatus(); if (on) syncOthers(); else tick(); }
+function renderWatchList() {
+  $('watchList').innerHTML = S.watch.map(b => {
+    const nm = b === S.bib ? (S.chipName || (S.entry && S.entry.name) || '') : modelOf(b, XS[b]).name;
+    return `<li><b style="color:${colorOf(b)}">#${b}</b><span>${esc(nm || '')}${b === S.bib ? ' <span class="tag start">vybraný</span>' : ''}</span>` +
+      (S.watch.length > 1 ? `<button class="ghost danger" data-rm="${b}">✕</button>` : '<span></span>') + '</li>';
+  }).join('') || '<li><span></span><span class="muted">Zadaj štartové číslo vyššie.</span><span></span></li>';
+  $('watchList').querySelectorAll('[data-rm]').forEach(x => x.onclick = () => {
+    const b = x.dataset.rm; S.watch = S.watch.filter(w => w !== b);
+    if (b === S.bib) { S.bib = S.watch[0] || ''; SH = XS[S.bib] || null; S.sh = SH; kmLaps = 0; }
+    save(); refreshAll(); renderRunBar(); renderWatchList(); renderOthers(); sync();
+  });
+}
+
+// ---------- zadanie prechodu ----------
+let pendingD = null;
+function openCp(ll) {
+  const hint = lastP ? lastP.d : 0;
+  const opts = snap(ll, hint);
+  if (!opts) { flashHint('Klikni bližšie k trase'); return; }
+  pickCp(opts[0], opts);
+  $('cpTime').value = toLocalInput(now()).slice(11);
+  $('cpMsg').textContent = '';
+  $('cpShare').textContent = sim && sim.shared ? `Simulácia – uvidia to všetci, čo sledujú č. ${S.bib}. Po ukončení simulácie sa to zmaže.`
+    : canShare() ? `Uvidia to všetci, čo sledujú č. ${S.bib}. ` + (isAdmin() ? 'Si správca – poloha sa neoveruje.' : 'Overí sa, či si do 1 km od tohto miesta.')
+    : (sim ? 'Simulácia – uloží sa len v tomto zariadení.' : 'Bez štartového čísla – uloží sa len v tomto zariadení.');
+  closeSheet('setSheet');
+  $('cpSheet').classList.add('open');
+}
+function pickCp(d, opts) {
+  pendingD = d;
+  if (tempMarker) tempMarker.setMap(null);
+  tempMarker = new google.maps.Marker({ map, position: pointAt(d), zIndex: 20,
+    icon: { path: google.maps.SymbolPath.CIRCLE, scale: 9, fillColor: '#f59e0b', fillOpacity: 1, strokeColor: '#111', strokeWeight: 2 } });
+  $('cpTitle').textContent = `Prechod na ${fmtKm(d)} km`;
+  const pred = lastP && lastP.state !== 'pre' ? predictTimeAt(d) : null;
+  $('cpSub').textContent = pred ? `Predikcia: ${fmtClock(pred)}. Zadaj reálny čas, kedy ním prebehol.` : 'Zadaj reálny čas, kedy ním prebehol.';
+  $('cpAlt').innerHTML = opts.length > 1 ? 'Tadiaľto sa beží viackrát – ktorý prechod? ' +
+    [...opts].sort((a, b) => a - b).map(o => `<button class="${o === d ? 'on' : ''}" data-d="${o}">${fmtKm(o)} km</button>`).join(' ') : '';
+  $('cpAlt').querySelectorAll('button').forEach(b => b.onclick = () => pickCp(+b.dataset.d, opts));
+}
+function predictTimeAt(d) {
+  const all = anchors(); const prev = [...all].reverse().find(a => a.d <= d) || all[0];
+  const P = predict(now());
+  return prev.t + (d - prev.d) * P.pace;
+}
+function flashHint(txt) { const h = $('hint'), o = h.textContent; h.textContent = txt; setTimeout(() => h.textContent = o, 2000); }
+$('cpNow').onclick = () => $('cpTime').value = toLocalInput(now()).slice(11);
+$('cpCancel').onclick = () => { closeSheet('cpSheet'); if (tempMarker) tempMarker.setMap(null); };
+$('cpSave').onclick = async () => {
+  const v = $('cpTime').value; if (!v || pendingD == null) return;
+  const t = timeOnStartDay(v), d = pendingD < 50 ? 0 : Math.round(pendingD); // klik na štart = upresnenie štartu
+  const done = () => { closeSheet('cpSheet'); if (tempMarker) tempMarker.setMap(null); setFollow(true); };
+  if (!canShare()) { S.localCps.push({ id: 'l' + Date.now(), d, t, src: 'manual', local: true }); refreshAll(); return done(); }
+  const btn = $('cpSave'); btn.disabled = true;
+  try {
+    const simShared = !!(sim && sim.shared);
+    const body = { d, t, clientId: S.clientId, name: S.name, sim: simShared };
+    if (!isAdmin() && !simShared) {
+      if (Date.now() - t > 15 * 60e3) throw new Error('čas prechodu môže byť najviac 15 minút dozadu');
+      $('cpMsg').textContent = 'Zisťujem tvoju polohu…';
+      const c = await getPos();
+      const dist = hav({ lat: c.latitude, lng: c.longitude }, pointAt(d));
+      if (dist - Math.min(c.accuracy, 100) > 1000) throw new Error(`si ${(dist / 1000).toFixed(1).replace('.', ',')} km od tohto miesta – upresniť môže len niekto do 1 km`);
+      Object.assign(body, { lat: c.latitude, lng: c.longitude, acc: c.accuracy });
+    }
+    $('cpMsg').textContent = 'Ukladám…';
+    await api('POST', `/api/runner/${S.bib}/cp`, body);
+    done(); await sync();
+  } catch (e) { $('cpMsg').textContent = '⚠ ' + e.message; }
+  finally { btn.disabled = false; }
+};
+
+// ---------- nastavenia ----------
+function closeSheet(id) { $(id).classList.remove('open'); }
+$('openSettings').onclick = () => { closeSheet('cpSheet'); fillSettings(); $('setSheet').classList.add('open'); };
+$('setClose').onclick = () => closeSheet('setSheet');
+function fillSettings() {
+  $('bib').value = S.bib; $('pace').value = fmtPace(S.pace); $('obsName').value = S.name;
+  $('startAt').value = toLocalInput(startInfo().t);
+  renderAdmin();
+  $('simKm').value = qs.get('simkm') || ''; $('simTime').value = qs.get('sim') || ''; if (qs.get('speed')) $('simSpeed').value = qs.get('speed');
+  renderWave(); renderCpList(); renderSplits(predict(now())); renderChipStatus();
+  renderWatchList(); fillLeaderSettings();
+}
+function renderAdmin() {
+  const editable = !isShared() || isAdmin();
+  $('pace').disabled = !editable; $('startAt').disabled = !editable;
+  $('paceNote').textContent = (editable ? '' : 'Tempo a štart nastavuje správca. ') +
+    'Plánované tempo platí, kým nie je známy žiadny reálny prechod. Potom sa počíta tempo z posledného úseku.';
+  $('chipAdmin').hidden = !isAdmin();
+  if (isAdmin() && document.activeElement !== $('chipUrl')) api('GET', '/api/config').then(j => $('chipUrl').value = j.claxUrl).catch(() => {});
+  $('syncInfo').textContent = isShared() ? syncMsg + (isAdmin() ? ' · si správca' : '') : 'Bez štartového čísla – nič sa nezdieľa.';
+  $('shareBtn').hidden = !isShared();
+  const adm = isAdmin();
+  $('adminOut').hidden = adm; $('adminIn').hidden = !adm;
+  if (adm) $('adminLink').value = `${location.origin}/?bib=${S.bib}&admin=${S.adminToken}`;
+  if (!isShared()) $('adminMsg').textContent = 'Najprv zadaj štartové číslo.';
+  $('simNote').textContent = sim && sim.shared ? `Si pripojený k spoločnej simulácii ${sim.speed}×.` + (adm ? ' „Ukončiť“ ju zastaví pre všetkých.' : ' „Ukončiť“ ťa od nej odpojí.')
+    : adm ? 'Ako správca spúšťaš spoločnú simuláciu – ostatní sa k nej môžu pripojiť.' : 'Simulácia posúva len čas a beží len v tomto zariadení.';
+}
+$('adminLogin').onclick = async () => {
+  $('adminMsg').textContent = '';
+  try {
+    const j = await api('POST', '/api/login', { password: $('adminPass').value });
+    S.adminToken = j.token; $('adminPass').value = ''; save(); await sync(); fillSettings();
+  } catch (e) { $('adminMsg').textContent = '⚠ ' + e.message; }
+};
+$('adminPass').onkeydown = e => { if (e.key === 'Enter') $('adminLogin').click(); };
+$('adminCopy').onclick = async () => { try { await navigator.clipboard.writeText($('adminLink').value); $('adminCopy').textContent = 'Skopírované'; setTimeout(() => $('adminCopy').textContent = 'Kopírovať', 1500); } catch { $('adminLink').select(); } };
+$('adminLogout').onclick = async () => { S.adminToken = ''; save(); await sync(); fillSettings(); };
+function renderWave() {
+  const D = disc(), si = startInfo(), ds = discStart();
+  $('discSel').value = S.discOverride;
+  $('waveInfo').textContent = D.unsupported ? `${D.name} má inú trasu – appka ho nevie zobraziť.` :
+    `${D.name} (${D.src}) · ${(TOTAL() / 1000).toFixed(1).replace('.', ',')} km, ${D.laps} ${D.laps > 1 ? 'okruhy' : 'okruh'} · štart podľa programu ${fmtClock(ds.t).slice(0, 5)}. ` +
+    `Použitý štart: ${fmtClock(si.t)} (${si.src})` + ((S.chipName || S.entry && S.entry.name) ? ` · ${S.chipName || S.entry.name}` : '');
+}
+$('discSel').onchange = () => { S.discOverride = $('discSel').value; kmLaps = 0; refreshAll(); fillSettings(); };
+$('bib').onchange = () => {
+  const nb = normBib($('bib').value), i = S.watch.indexOf(S.bib);
+  if (i >= 0) { if (nb) S.watch[i] = nb; else S.watch.splice(i, 1); } // vybraný bežec sa nahradí
+  S.watch = [...new Set(S.watch)];
+  S.bib = nb; ensureWatch(); S.discOverride = ''; kmLaps = 0; SH = null; renderRunBar(); S.sh = null; syncMsg = 'Načítavam…'; save(); fillSettings(); sync(); };
+$('obsName').onchange = () => { S.name = $('obsName').value.trim().slice(0, 30); save(); };
+$('shareBtn').onclick = async () => {
+  const url = `${location.origin}/?bib=${S.watch.join(',')}`;
+  try { if (navigator.share) await navigator.share({ title: 'Kde je bežec', text: `Sleduj č. ${S.bib} na MMM Košice`, url }); else { await navigator.clipboard.writeText(url); alert('Odkaz skopírovaný:\n' + url); } } catch {}
+};
+$('startAt').onchange = async () => {
+  const v = $('startAt').value; if (!v) return; const t = new Date(v).getTime();
+  if (!isShared()) { S.localCps.push({ id: 'l' + Date.now(), d: 0, t, src: 'manual', local: true }); return refreshAll(); }
+  try { await api('POST', `/api/runner/${S.bib}/cp`, { d: 0, t, clientId: S.clientId, name: S.name || 'správca' }); await sync(); } catch (e) { alert(e.message); }
+};
+$('pace').onchange = async () => {
+  const m = $('pace').value.trim().match(/^(\d{1,2})[:.,](\d{1,2})$/);
+  if (m) {
+    const pace = +m[1] * 60 + +m[2];
+    if (!isShared()) { S.localPace = pace; refreshAll(); }
+    else try { await api('PUT', `/api/runner/${S.bib}`, { pace }); await sync(); } catch (e) { alert(e.message); }
+  }
+  $('pace').value = fmtPace(S.pace);
+};
+$('chipNow').onclick = () => { syncMsg = 'Načítavam…'; renderAdmin(); sync(); };
+$('chipUrl').onchange = async () => {
+  let v = $('chipUrl').value.trim();
+  // odkaz „Live výsledky“ zo starej stránky (results.championchip.cz alebo results2…) → priamo .clax
+  const live = v.match(/^https?:\/\/(results\d*\.championchip\.cz)\/public\/g-live\.html\?f=\.\.\/([^&#]+)/);
+  if (live) v = `https://${live[1]}/` + decodeURIComponent(live[2]).replace(/ /g, '%20');
+  // odkaz z race.championchip.cz/results.php si server preloží sám
+  try { const j = await api('PUT', '/api/config', { claxUrl: v }); $('chipUrl').value = j.claxUrl; await sync(); } catch (e) { alert(e.message); }
+};
+$('simStart').onclick = async () => {
+  const p = new URLSearchParams(), km = $('simKm').value.trim(), tm = $('simTime').value;
+  if (!km && !tm) { alert('Zadaj km alebo čas.'); return; }
+  if (isShared() && isAdmin()) { // spoločná simulácia pre všetkých
+    if (sim && sim.local) { location.search = `?bib=${S.bib}`; return; } // najprv zruš lokálnu
+    const base = km ? timeAtKm(km) : new Date(simDay() + 'T' + (tm.length === 5 ? tm + ':00' : tm)).getTime();
+    try { const j = await api('PUT', `/api/runner/${S.bib}/sim`, { base, speed: +$('simSpeed').value }); S.simJoin = j.t0; save(); await sync(); closeSheet('setSheet'); } catch (e) { alert(e.message); }
+    return;
+  }
+  if (km) p.set('simkm', km.replace(',', '.')); else p.set('sim', tm);
+  p.set('speed', $('simSpeed').value);
+  if (qs.get('simday')) p.set('simday', qs.get('simday'));
+  location.search = p.toString();
+};
+$('simStop').onclick = async () => {
+  if (sim && sim.shared && isAdmin()) { try { await api('DELETE', `/api/runner/${S.bib}/sim`); await sync(); } catch (e) { alert(e.message); } return; }
+  if (sim && sim.shared) { $('simLeave').click(); return; }
+  location.search = S.bib ? `?bib=${S.bib}` : '';
+};
+$('resetAll').onclick = () => {
+  if (!confirm('Vymazať prechody uložené len v tomto zariadení? Zdieľané ostanú.')) return;
+  S.localCps = []; refreshAll(); fillSettings();
+};
+function renderCpList() {
+  const all = anchors();
+  const si = startInfo();
+  $('cpList').innerHTML = all.map((a, i) => {
+    const prev = all[i - 1];
+    const seg = prev ? (a.t - prev.t) / (a.d - prev.d) : null;
+    const bad = prev && a.t <= prev.t;
+    const who = c => c.local ? 'lokálne' : esc(c.name || 'ručne');
+    const cp = a.src === 'start' ? (si.src === 'ručne' ? S.startCp : null) : a;
+    const tag = a.src === 'start' ? `<span class="tag start">štart · ${cp ? who(cp) : si.src}</span>` : a.src === 'chip' ? `<span class="tag chip">${a.via === 'tracx' ? 'čip · TRACX' : 'čip'}</span>` : `<span class="tag manual">${who(a)}</span>`;
+    const del = cp && cp.src === 'manual' && (cp.local || cp.mine || isAdmin());
+    return `<li><b>${fmtKm(a.d)}</b><div>${fmtClock(a.t)}${tag}<div class="${bad ? 'warn' : 'muted'}">${bad ? 'čas je skôr ako predošlý bod!' : seg ? 'úsek ' + fmtPace(seg) + '/km' : ''}</div></div>` +
+      (del ? `<button class="ghost danger" data-del="${cp.id}">✕</button>` : '<span></span>') + '</li>';
+  }).join('') + (S.cps.length ? '' : '<li><span></span><span class="muted">Zatiaľ žiadne. Ťukni na trasu v mape.</span><span></span></li>');
+  $('cpList').querySelectorAll('[data-del]').forEach(b => b.onclick = async () => {
+    const id = b.dataset.del;
+    if (S.localCps.some(c => c.id === id)) { S.localCps = S.localCps.filter(c => c.id !== id); return refreshAll(); }
+    if (!confirm('Zmazať tento prechod pre všetkých?')) return;
+    try { await api('DELETE', `/api/runner/${S.bib}/cp/${id}?clientId=${encodeURIComponent(S.clientId)}`); await sync(); } catch (e) { alert(e.message); }
+  });
+}
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+function renderSplits(P) {
+  const T = TOTAL(), marks = [];
+  for (let m = 5000; m < T - 500; m += 5000) marks.push(m);
+  if (T > LOOP) marks.splice(marks.findIndex(m => m > LOOP), 0, LOOP); // polovica maratónu
+  marks.push(T);
+  const all = anchors();
+  $('splits').innerHTML = marks.map(m => {
+    const known = all.find(a => Math.abs(a.d - m) < 30 && a.t <= now());
+    let t;
+    if (known) t = known.t;
+    else if (P.state === 'pre') t = P.st + m * S.pace;
+    else { const base = P.last && P.last.d <= m ? P.last : [...all].reverse().find(a => a.d <= m && a.t <= now()) || all[0]; t = base.t + (m - base.d) * P.pace; }
+    const done = t <= now();
+    return `<tr class="${done ? 'done' : ''}"><td>${m === T ? 'Cieľ' : m === LOOP ? '21,1 km' : m / 1000 + ' km'}</td><td>${known ? 'reálne' : (done ? 'predikcia (prešiel)' : 'predikcia')}</td><td>${fmtClock(t)} · ${fmtDur(t - P.st)}</td></tr>`;
+  }).join('');
+}
+
+// ---------- čip: server sťahuje championchip.cz raz za minútu pre všetkých ----------
+function renderChipStatus() {
+  const c = SH && SH.chip, x = SH && SH.tracx;
+  const clax = !isShared() ? 'Vyžaduje štartové číslo.' : !c ? 'Načítavam…' :
+    c.status !== 'ok' ? 'Čip: ' + c.status :
+    `Čip OK ${c.updated ? fmtClock(c.updated) : ''}${c.name ? ' · ' + c.name : ''} · ${c.start ? 'štart ' + fmtClock(c.start) : 'ešte neštartoval'} · medzičasov: ${(c.cps || []).length}`;
+  const tx = !isShared() ? '' : !SH || !SH.entry ? ' · TRACX: číslo sa nenašlo' : !x ? '' :
+    x.status !== 'ok' ? ' · TRACX: ' + x.status : ` · TRACX ${x.start ? 'štart ' + fmtClock(x.start) : 'pred štartom'}, medzičasov: ${(x.cps || []).length}`;
+  $('chipStatus').textContent = clax + tx;
+}
+
+// ---------- prepínanie pohľadov ----------
+function setView(v) {
+  S.view = v; save(); document.body.dataset.view = v;
+  document.querySelectorAll('.tabs .v').forEach(b => b.classList.toggle('on', b.dataset.view === v));
+  if (map) setTimeout(() => { google.maps.event.trigger(map, 'resize'); svLastD = -1e9; tick(); }, 50);
+}
+document.querySelectorAll('.tabs .v').forEach(b => b.onclick = () => setView(b.dataset.view));
+$('simJoin').onclick = () => {
+  S.simJoin = SH.sim.t0; save();
+  if (sim && sim.local) { location.search = `?bib=${S.bib}`; return; } // zrušiť vlastnú simuláciu
+  applySharedSim(); refreshAll();
+};
+$('simLeave').onclick = () => { S.simJoin = null; save(); applySharedSim(); refreshAll(); };
+$('simEndAll').onclick = async () => {
+  if (!confirm('Ukončiť simuláciu pre všetkých?')) return;
+  try { await api('DELETE', `/api/runner/${S.bib}/sim`); await sync(); } catch (e) { alert(e.message); }
+};
+// ◎ Sledovať → ⤢ Všetci → voľne → …
+$('follow').onclick = () => !follow ? setFollow(true, 'one') : S.followMode === 'one' ? setFollow(true, 'all') : setFollow(false);
+$('leadersBtn').onclick = () => setLeaders(!S.ld.on);
+$('ldOn').onchange = () => setLeaders($('ldOn').checked);
+$('ldN').onchange = () => { S.ld.n = +$('ldN').value; save(); tick(); };
+$('ldSex').onchange = () => { S.ld.sex = $('ldSex').checked; save(); tick(); };
+$('watchAddBtn').onclick = () => {
+  const b = normBib($('watchAdd').value); if (!b) return;
+  $('watchAdd').value = '';
+  if (!S.watch.includes(b)) S.watch.push(b);
+  if (!S.bib) S.bib = b;
+  save(); renderRunBar(); renderWatchList(); syncOthers(); if (S.bib === b) sync();
+};
+$('mode3d').onclick = () => set3D(!S.map3d);
+
+// obrazovka nezhasne počas sledovania
+let wake = null;
+async function keepAwake() { try { if (!wake && 'wakeLock' in navigator) { wake = await navigator.wakeLock.request('screen'); wake.onrelease = () => wake = null; } } catch {} }
+document.addEventListener('click', keepAwake, { once: true });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { keepAwake(); sync(); } });
+
+// ---------- štart appky ----------
+(async () => {
+  R = buildRoute(await (await fetch('route.json')).json());
+  setView(S.view || 'map');
+  derive(); save();
+  tick();
+  sync();
+  const s = document.createElement('script');
+  s.src = 'https://maps.googleapis.com/maps/api/js?key=__API_KEY__&v=weekly&loading=async&callback=initMap&libraries=marker&language=sk&region=SK';
+  s.async = true; document.head.appendChild(s);
+})();
+window.initMap = initMap;
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+</script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+# tajomstvá (vkladajú sa až pri nasadení)
+.apikey
+.admintoken
+.env
+# dáta servera – mená, IP adresy, prechody
+api/data/
+# lokálne
+.DS_Store
+node_modules/
+*.clax
