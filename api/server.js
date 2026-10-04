@@ -54,56 +54,105 @@ function save() {
 const runner = bib => (state.runners[bib] ||= { pace: 295, cps: [] });
 
 // ---------- čip ----------
-const chip = { status: 'ešte nenačítané', updated: null, etag: null, text: null, day: null, tz: 120, splits: {} };
+// dva zdroje: starý súbor Wiclax .clax (results*.championchip.cz) alebo JSON z race.championchip.cz (od 2026)
+// oba sa prevedú na chip.runners: bib → { bib, race, name, sex, nat, start, cps:[{id,d,t}] }
+const chip = { status: 'ešte nenačítané', updated: null, ver: 0, etag: null, hash: null, runners: null, day: null, tz: 120, splits: {} };
 const watched = new Map(); // bib → posledný dopyt
 const attrs = tag => Object.fromEntries([...tag.matchAll(/(\w+)="([^"]*)"/g)].map(m => [m[1], m[2]]));
 const pad = n => String(n).padStart(2, '0');
-function claxTime(s) {
+const tzStr = () => { const a = Math.abs(chip.tz), sign = chip.tz >= 0 ? '+' : '-'; return `${sign}${pad(Math.floor(a / 60))}:${pad(a % 60)}`; };
+function claxTime(s) { // "10h30'51,477"
   const m = s && s.match(/(\d+)h(\d+)'(\d+)(?:,(\d+))?/); if (!m) return null;
-  const a = Math.abs(chip.tz), sign = chip.tz >= 0 ? '+' : '-';
-  return new Date(`${chip.day}T${pad(m[1])}:${pad(m[2])}:${pad(m[3])}${sign}${pad(Math.floor(a / 60))}:${pad(a % 60)}`).getTime() + (m[4] ? +('0.' + m[4]) * 1000 : 0);
+  return new Date(`${chip.day}T${pad(m[1])}:${pad(m[2])}:${pad(m[3])}${tzStr()}`).getTime() + (m[4] ? +('0.' + m[4]) * 1000 : 0);
+}
+function clockMs(s) { // "09:16:58,169"
+  const m = s && String(s).match(/(\d{1,2}):(\d{2}):(\d{2})(?:[,.](\d+))?/); if (!m) return null;
+  return new Date(`${chip.day}T${pad(m[1])}:${m[2]}:${m[3]}${tzStr()}`).getTime() + (m[4] ? +('0.' + m[4]) * 1000 : 0);
+}
+function durMs(s) { // "1:07:18", "54:39,6", "16:57"
+  const m = s && String(s).trim().match(/^(?:(\d+):)?(\d{1,2}):(\d{2})(?:[,.](\d+))?$/); if (!m) return null;
+  return ((+(m[1] || 0) * 60 + +m[2]) * 60 + +m[3]) * 1000 + (m[4] ? +('0.' + m[4]) * 1000 : 0);
+}
+const raceTotal = race => RACE_TOTAL[race] || LOOP;
+function normalizeClax(txt) {
+  const head = attrs((txt.match(/<Epreuve\b[^>]*>/) || [''])[0]);
+  chip.day = head.dt1; chip.tz = +(head.TZ || 120);
+  chip.splits = {};
+  for (const m of txt.matchAll(/<Pointage\b[^>]*>/g)) { const a = attrs(m[0]); chip.splits[a.id] = +a.dist; }
+  const runners = new Map();
+  for (const m of txt.matchAll(/<E\b[^>]*>/g)) {
+    const a = attrs(m[0]);
+    runners.set(a.d, { bib: a.d, race: a.p || null, name: (a.n || '').replace(/ /g, ' '), sex: a.x === 'F' ? 'F' : 'M', nat: a.na || '', start: claxTime(a.h), cps: [] });
+  }
+  for (const m of txt.matchAll(/<R\b[^>]*>/g)) {
+    const a = attrs(m[0]), x = runners.get(a.d); if (!x) continue;
+    const total = raceTotal(x.race);
+    for (const [k, v] of Object.entries(a)) {
+      const mm = k.match(/^pb(\d+)$/); if (!mm || chip.splits[mm[1]] == null || chip.splits[mm[1]] >= total) continue;
+      const t = claxTime(v); if (t) x.cps.push({ id: 'chip' + mm[1], d: chip.splits[mm[1]], t });
+    }
+    if (a.b) { const t = claxTime(a.b); if (t) x.cps.push({ id: 'chipF', d: total, t }); }
+    x.cps.sort((p, q) => p.d - q.d);
+  }
+  return runners;
+}
+function normalizeRaceJson(data) {
+  const st = (data.stages || []).find(x => x.index === data.activeStage) || (data.stages || [])[0] || {};
+  chip.day = data.event && data.event.dateFrom || chip.day; chip.tz = 120; // MMM: CEST
+  const pts = {}; for (const p of st.pointages || []) pts[String(p.id)] = p.distanceM;
+  const runners = new Map();
+  const mk = e => ({ bib: String(e.bib), race: e.race || null, name: String(e.name || '').replace(/\u00a0/g, ' '), sex: e.sex === 'F' ? 'F' : 'M', nat: e.nation || '', start: null, cps: [] });
+  for (const e of st.startlist || []) runners.set(String(e.bib), mk(e));
+  for (const r of st.rows || []) {
+    const x = runners.get(String(r.bib)) || mk(r); runners.set(x.bib, x);
+    const total = raceTotal(x.race);
+    x.cps = [];
+    for (const p of r.splits || []) {
+      const id = String(p.id ?? ''), t = clockMs(p.clock); if (!t) continue;
+      const fin = id === '' || id === '999', d = fin ? total : pts[id];
+      if (d == null || (!fin && d >= total)) continue;
+      x.cps.push({ id: fin ? 'chipF' : 'chip' + id, d, t });
+      const dt = durMs(p.time); if (!x.start && dt) x.start = t - dt;
+    }
+    const ft = clockMs(r.finishClock);
+    if (ft && !x.cps.some(c => c.d >= total)) x.cps.push({ id: 'chipF', d: total, t: ft });
+    const rt = durMs(r.realTime || r.time); if (ft && rt) x.start = ft - rt; // čistý čas → reálny štart
+    x.cps.sort((p, q) => p.d - q.d);
+  }
+  return runners;
+}
+async function pollRace(src) {
+  const q = `event=${encodeURIComponent(src.event)}&block=${encodeURIComponent(src.block)}`;
+  let hash = null;
+  try { const v = await (await fetch(`https://race.championchip.cz/api/wiclax_version.php?${q}`, { signal: AbortSignal.timeout(8000) })).json(); hash = v.hash || v.sourceHash || null; } catch {}
+  if (chip.runners && hash && hash === chip.hash) { chip.status = 'ok'; chip.updated = Date.now(); return; }
+  const r = await fetch(`https://race.championchip.cz/api/wiclax_results.php?${q}`, { signal: AbortSignal.timeout(25000) });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  const j = await r.json();
+  if (!j.ok || !j.data) throw new Error(j.error || 'neplatná odpoveď');
+  chip.runners = normalizeRaceJson(j.data); chip.hash = hash || j.hash || null; chip.ver++;
+  chip.status = 'ok'; chip.updated = Date.now();
 }
 async function pollChip() {
   const active = [...watched.values()].some(t => Date.now() - t < WATCH_TTL);
   if (!active) return;
   try {
+    if (state.raceSrc) return await pollRace(state.raceSrc);
     const res = await fetch(state.claxUrl, { headers: chip.etag ? { 'If-None-Match': chip.etag } : {} });
     if (res.status === 304) { chip.status = 'ok'; chip.updated = Date.now(); return; }
-    if (res.status === 404) { chip.status = 'súbor zatiaľ nie je zverejnený (404)'; chip.text = null; return; }
+    if (res.status === 404) { chip.status = 'súbor zatiaľ nie je zverejnený (404)'; chip.runners = null; return; }
     if (!res.ok) { chip.status = 'HTTP ' + res.status; return; }
-    const txt = await res.text();
-    const head = attrs((txt.match(/<Epreuve\b[^>]*>/) || [''])[0]);
-    chip.day = head.dt1; chip.tz = +(head.TZ || 120);
-    chip.splits = {};
-    for (const m of txt.matchAll(/<Pointage\b[^>]*>/g)) { const a = attrs(m[0]); chip.splits[a.id] = +a.dist; }
-    chip.text = txt; chip.etag = res.headers.get('etag'); chip.status = 'ok'; chip.updated = Date.now();
+    chip.runners = normalizeClax(await res.text()); chip.ver++;
+    chip.etag = res.headers.get('etag'); chip.status = 'ok'; chip.updated = Date.now();
   } catch (e) { chip.status = 'chyba: ' + e.message; }
 }
 setInterval(pollChip, CHIP_POLL);
-const chipCache = new Map(); // bib → {updated, data}
 function chipFor(bib) {
   const base = { status: chip.status, updated: chip.updated };
-  if (!chip.text) return base;
-  const c = chipCache.get(bib);
-  if (c && c.updated === chip.updated) return c.data;
-  const eTag = (chip.text.match(new RegExp(`<E d="${bib}"[^>]*>`)) || [])[0];
-  let data;
-  if (!eTag) data = { ...base, status: `číslo ${bib} sa v súbore nenašlo` };
-  else {
-    const e = attrs(eTag);
-    const rTag = (chip.text.match(new RegExp(`<R d="${bib}"[^>]*>`)) || [])[0];
-    const r = rTag ? attrs(rTag) : {};
-    const total = RACE_TOTAL[e.p] || LOOP;
-    const cps = [];
-    for (const [k, v] of Object.entries(r)) {
-      const m = k.match(/^pb(\d+)$/); if (!m || chip.splits[m[1]] == null || chip.splits[m[1]] >= total) continue;
-      const t = claxTime(v); if (t) cps.push({ id: 'chip' + m[1], d: chip.splits[m[1]], t, src: 'chip' });
-    }
-    if (r.b) { const t = claxTime(r.b); if (t) cps.push({ id: 'chipF', d: total, t, src: 'chip' }); }
-    data = { ...base, name: e.n ? e.n.replace(/ /g, ' ') : null, race: e.p || null, start: claxTime(e.h), cps };
-  }
-  chipCache.set(bib, { updated: chip.updated, data });
-  return data;
+  if (!chip.runners) return base;
+  const x = chip.runners.get(String(bib));
+  if (!x) return { ...base, status: `číslo ${bib} sa v dátach z čipu nenašlo` };
+  return { ...base, name: x.name || null, race: x.race, start: x.start, cps: x.cps.map(c => ({ ...c, src: 'chip' })) };
 }
 
 // ---------- TRACX (oficiálna appka MYLAPS): číslo → disciplína, štart vlny, meno ----------
@@ -180,42 +229,24 @@ function pickTop(list, cmp) {
 }
 function favPace(r) { return (ELITE_PACE[r.key] || {})[r.sex === 'F' ? 'F' : 'M'] || 200; }
 let leadersCache = { key: null, data: null };
-function leadersFromClax() {
-  if (leadersCache.key === chip.updated && leadersCache.data) return leadersCache.data;
-  const E = new Map();
-  for (const m of chip.text.matchAll(/<E\b[^>]*>/g)) {
-    const a = attrs(m[0]), key = P2KEY[a.p];
-    if (key) E.set(a.d, { bib: a.d, name: (a.n || '').replace(/\u00a0/g, ' '), sex: a.x === 'F' ? 'F' : 'M', nat: a.na || '', key, start: claxTime(a.h) });
-  }
-  const moving = {};
-  for (const m of chip.text.matchAll(/<R\b[^>]*>/g)) {
-    const a = attrs(m[0]), e = E.get(a.d); if (!e) continue;
-    const total = e.key === 'maraton' || e.key === 'stafeta' ? 2 * LOOP : LOOP;
-    const cps = [];
-    for (const [k, v] of Object.entries(a)) {
-      const mm = k.match(/^pb(\d+)$/); if (!mm || chip.splits[mm[1]] == null || chip.splits[mm[1]] >= total) continue;
-      const t = claxTime(v); if (t) cps.push({ d: chip.splits[mm[1]], t });
-    }
-    if (a.b) { const t = claxTime(a.b); if (t) cps.push({ d: total, t }); }
-    if (!cps.length) continue;
-    cps.sort((x, y) => x.d - y.d);
-    const last = cps[cps.length - 1];
-    (moving[e.key] ||= []).push({ ...e, cps, maxD: last.d, tAt: last.t });
-  }
+function leadersFromChip() {
+  if (leadersCache.key === chip.ver && leadersCache.data) return leadersCache.data;
+  const all = [...chip.runners.values()].map(x => ({ ...x, key: P2KEY[x.race] })).filter(x => x.key);
   const out = {};
   for (const key of Object.values(P2KEY)) {
-    if (moving[key] && moving[key].length) {
-      const top = pickTop(moving[key], (x, y) => y.maxD - x.maxD || x.tAt - y.tAt);
-      for (const c of ['all', 'M', 'F']) top[c] = top[c].map(({ maxD, tAt, ...r }) => r);
+    const list = all.filter(x => x.key === key);
+    const moving = list.filter(x => x.cps.length).map(x => { const l = x.cps[x.cps.length - 1]; return { ...x, maxD: l.d, tAt: l.t }; });
+    if (moving.length) {
+      const top = pickTop(moving, (p, q) => q.maxD - p.maxD || p.tAt - q.tAt);
+      for (const c of ['all', 'M', 'F']) top[c] = top[c].map(({ maxD, tAt, race, ...r }) => ({ ...r, cps: r.cps.map(({ d, t }) => ({ d, t })) }));
       out[key] = { fav: false, ...top };
     } else {
-      const fav = [...E.values()].filter(r => r.key === key);
-      const top = pickTop(fav, (x, y) => +x.bib - +y.bib);
-      for (const c of ['all', 'M', 'F']) top[c] = top[c].map(r => ({ ...r, cps: [], pace: favPace(r) }));
+      const top = pickTop(list, (p, q) => (parseInt(p.bib.replace(/\D/g, ''), 10) || 1e9) - (parseInt(q.bib.replace(/\D/g, ''), 10) || 1e9));
+      for (const c of ['all', 'M', 'F']) top[c] = top[c].map(({ race, ...r }) => ({ ...r, cps: [], pace: favPace(r) }));
       out[key] = { fav: true, ...top };
     }
   }
-  leadersCache = { key: chip.updated, data: out };
+  leadersCache = { key: chip.ver, data: out };
   return out;
 }
 // bez súboru z čipu: favoriti z TRACX (rebríčky sú pred štartom zoradené podľa čísla)
@@ -271,18 +302,16 @@ http.createServer(async (req, res) => {
         if (!isAdmin(req)) return send(res, 403, { error: 'len pre správcu' });
         const b = await readBody(req);
         let u = String(b.claxUrl || '').trim();
-        // odkaz zo stránky race.championchip.cz/results.php?event=…&block=… → zistiť zdrojový .clax
         const rp = u.match(/^https:\/\/race\.championchip\.cz\/results\.php\?(.*)$/);
-        if (rp) {
+        if (rp) { // nový systém: JSON API race.championchip.cz (zdroj .clax už nie je verejný)
           const q = new URLSearchParams(rp[1]);
-          try {
-            const meta = await (await fetch(`https://race.championchip.cz/api/wiclax_live_meta.php?event=${encodeURIComponent(q.get('event') || '')}&block=${encodeURIComponent(q.get('block') || '')}`)).json();
-            if (!meta.ok || !meta.sourceUrl) return send(res, 400, { error: 'z odkazu sa nepodarilo zistiť súbor s výsledkami' });
-            u = meta.sourceUrl;
-          } catch (e) { return send(res, 502, { error: 'race.championchip.cz neodpovedá: ' + e.message }); }
-        }
-        if (!/^https:\/\/results\d*\.championchip\.cz\/.+\.clax$/.test(u)) return send(res, 400, { error: 'neznámy odkaz – vlož odkaz z championchip.cz (Live výsledky alebo race.championchip.cz)' });
-        state.claxUrl = u.replace(/ /g, '%20'); chip.etag = null; chip.text = null; chip.status = 'načítavam…'; save(); await pollChip();
+          if (!q.get('event') || !q.get('block')) return send(res, 400, { error: 'v odkaze chýba event alebo block' });
+          state.raceSrc = { event: q.get('event'), block: q.get('block') }; state.claxUrl = u;
+        } else if (/^https:\/\/results\d*\.championchip\.cz\/.+\.clax$/.test(u)) {
+          state.raceSrc = null; state.claxUrl = u.replace(/ /g, '%20');
+        } else return send(res, 400, { error: 'neznámy odkaz – vlož odkaz z race.championchip.cz (výsledky) alebo .clax' });
+        chip.etag = null; chip.hash = null; chip.runners = null; chip.status = 'načítavam…'; save();
+        watched.set('*config', Date.now()); await pollChip();
         return send(res, 200, { claxUrl: state.claxUrl, status: chip.status });
       }
     }
@@ -298,9 +327,9 @@ http.createServer(async (req, res) => {
     if (url.pathname === '/api/leaders' && req.method === 'GET') {
       const first = !watched.has('*leaders') || Date.now() - watched.get('*leaders') > WATCH_TTL;
       watched.set('*leaders', Date.now());
-      if (first && !chip.text) await pollChip();
-      const data = chip.text ? leadersFromClax() : await favoritesFromTracx();
-      return send(res, 200, { source: chip.text ? 'čip' : 'TRACX', updated: chip.updated, chipStatus: chip.status, disciplines: data });
+      if (first && !chip.runners) await pollChip();
+      const data = chip.runners ? leadersFromChip() : await favoritesFromTracx();
+      return send(res, 200, { source: chip.runners ? 'čip' : 'TRACX', updated: chip.updated, chipStatus: chip.status, disciplines: data });
     }
     if (!m) return send(res, 404, { error: 'nenájdené' });
     const bib = m[1], sub = m[2], subId = m[3];
@@ -321,7 +350,7 @@ http.createServer(async (req, res) => {
     if (req.method === 'GET' && !sub) {
       const first = !watched.has(bib) || Date.now() - watched.get(bib) > WATCH_TTL;
       watched.set(bib, Date.now());
-      if (first && !chip.text) await pollChip();
+      if (first && !chip.runners) await pollChip();
       const entry = await entryFor(bib);
       const tracx = await tracxFor(entry);
       const r = state.runners[bib] || { cps: [] };

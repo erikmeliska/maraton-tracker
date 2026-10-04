@@ -412,8 +412,7 @@ function modelOf(bib, sh) {
     cps: [...manual.filter(c => c.d >= 50), ...chipCps, ...tx], pace: sh && sh.pace || D.pace };
 }
 function predictOf(m, t) {
-  const all = [{ d: 0, t: m.start, src: 'start' }, ...m.cps.filter(c => c.t > m.start)].sort((a, b) => a.d - b.d);
-  return predictCore(all, m.pace, m.T, m.D.min, t);
+  return predictCore(anchorList(m.start, m.cps.map(c => c.src ? c : { ...c, src: 'chip' })), m.pace, m.T, m.D.min, t);
 }
 function startInfo() {
   if (S.chipStart) return { t: S.chipStart, src: 'čip' };
@@ -422,8 +421,13 @@ function startInfo() {
 }
 function anchors() {
   const st = startInfo().t;
-  const list = [{ d: 0, t: st, src: 'start' }, ...S.cps.filter(c => c.t > st)];
-  return list.sort((a, b) => a.d - b.d);
+  return anchorList(st, S.cps);
+}
+// reálny medzičas z čipu prebíja staršie ručné body (pred ním na trati) – tie bývajú nepresné
+function anchorList(st, cps) {
+  const valid = cps.filter(c => c.t > st);
+  const chipD = Math.max(-1, ...valid.filter(c => c.src === 'chip' && c.t <= now()).map(c => c.d));
+  return [{ d: 0, t: st, src: 'start' }, ...valid.filter(c => c.src === 'chip' || c.d > chipD + 50)].sort((a, b) => a.d - b.d);
 }
 function paceFrom(list) { return paceCore(list, S.pace, disc().min); }
 function paceCore(list, pace, min) { // ms na meter, z posledného úseku (min. CFG.minSegForPace)
@@ -431,8 +435,11 @@ function paceCore(list, pace, min) { // ms na meter, z posledného úseku (min. 
   const last = list[list.length - 1];
   let prev = list[0];
   for (let i = list.length - 2; i >= 0; i--) { if (last.d - list[i].d >= CFG.minSegForPace) { prev = list[i]; break; } }
-  const p = (last.t - prev.t) / Math.max(1, last.d - prev.d);
-  return { p: Math.min(720, Math.max(min, p)), from: prev, to: last }; // napr. 2:30–12:00 /km
+  let p = (last.t - prev.t) / Math.max(1, last.d - prev.d), from = prev;
+  // poistka: úsek o >25 % rýchlejší ako priemer od štartu je skoro isto chybný bod → priemer
+  const avg = (last.t - list[0].t) / Math.max(1, last.d - list[0].d);
+  if (prev !== list[0] && p < avg * 0.75) { p = avg; from = list[0]; }
+  return { p: Math.min(720, Math.max(min, p)), from, to: last }; // napr. 2:30–12:00 /km
 }
 function predict(t) { return predictCore(anchors(), S.pace, TOTAL(), disc().min, t); }
 function predictCore(all, pace, T, min, t) {
